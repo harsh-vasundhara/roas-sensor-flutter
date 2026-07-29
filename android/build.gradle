@@ -1,0 +1,58 @@
+group 'com.roassensor.roas_flutter'
+version '0.1.0'
+
+buildscript {
+    ext.kotlin_version = '1.9.24'
+    repositories {
+        google()
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'com.android.tools.build:gradle:8.5.0'
+        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
+    }
+}
+
+rootProject.allprojects {
+    repositories {
+        google()
+        // mavenLocal() FIRST: com.roassensor:roas:0.1.0 is NOT actually live on
+        // Maven Central yet (verified against the real search API and a
+        // cache-free resolution — see roas-android-sdk's publishing notes).
+        // Run `./gradlew :roas:publishToMavenLocal` in roas-android-sdk first,
+        // then this resolves from ~/.m2 instead of failing. Safe to leave in
+        // place after the real Central publish lands — mavenLocal() is just
+        // tried first and falls through to mavenCentral() otherwise.
+        mavenLocal()
+        mavenCentral()
+    }
+}
+
+apply plugin: 'com.android.library'
+apply plugin: 'kotlin-android'
+
+android {
+    namespace 'com.roassensor.roas_flutter'
+    compileSdk 34
+
+    defaultConfig {
+        // Matches the roas-android-sdk module's own floor (roas/build.gradle.kts).
+        // If the host app also adds RevenueCat directly, IT needs minSdk 23 —
+        // that's a constraint on the app, not on this bridge.
+        minSdk 21
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+    kotlinOptions {
+        jvmTarget = '1.8'
+    }
+}
+
+dependencies {
+    // Published to Maven Central as of 2026-07-28 — no JitPack repository
+    // needed anymore (see rootProject.allprojects above).
+    implementation 'com.roassensor:roas:0.1.0'
+}
