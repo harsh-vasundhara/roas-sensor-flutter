@@ -16,13 +16,13 @@ buildscript {
 rootProject.allprojects {
     repositories {
         google()
-        // mavenLocal() FIRST: com.roassensor:roas:0.1.0 is NOT actually live on
-        // Maven Central yet (verified against the real search API and a
-        // cache-free resolution — see roas-android-sdk's publishing notes).
-        // Run `./gradlew :roas:publishToMavenLocal` in roas-android-sdk first,
-        // then this resolves from ~/.m2 instead of failing. Safe to leave in
-        // place after the real Central publish lands — mavenLocal() is just
-        // tried first and falls through to mavenCentral() otherwise.
+        // com.roassensor:roas is published on Maven Central as of 2026-07-28 —
+        // mavenCentral() alone resolves it, no JitPack/mavenLocal workaround
+        // needed anymore. mavenLocal() is kept ahead of it purely as a local-dev
+        // convenience (e.g. testing an unreleased roas-android-sdk build via
+        // `./gradlew :roas:publishToMavenLocal`); it's a no-op fallthrough to
+        // mavenCentral() for everyone else since nothing is normally published
+        // to ~/.m2.
         mavenLocal()
         mavenCentral()
     }

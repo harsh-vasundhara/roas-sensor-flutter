@@ -1,5 +1,5 @@
 name: roas_flutter
-description: Flutter bridge for the ROASSensor Android tracking SDK (install attribution, funnel events, identity).
+description: Flutter bridge for the ROASSensor Android and iOS tracking SDKs (install attribution, funnel events, identity).
 version: 0.1.0
 homepage: https://github.com/harsh-vasundhara/roas-android-sdk
 
@@ -20,4 +20,6 @@ flutter:
     platforms:
       android:
         package: com.roassensor.roas_flutter
+        pluginClass: RoasFlutterPlugin
+      ios:
         pluginClass: RoasFlutterPlugin

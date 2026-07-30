@@ -1,39 +1,71 @@
 # roas_flutter
 
-A thin Flutter bridge to the native **roas-android-sdk** (`com.roassensor.sdk.Roas`).
-Android-only today — there is no iOS SDK yet, so calling any method on iOS is a
-no-op, not a crash, but it also means **no real tracking happens on iOS builds
-of an app that only has this bridge**.
+A thin Flutter bridge to the native **roas-android-sdk**
+(`com.roassensor.sdk.Roas`) and **RoasSensor iOS SDK** (`RoasSensor.Roas`,
+from `sdk-ios`). Both platforms have a native implementation behind this
+bridge — every other platform (web, desktop) is a no-op, not a crash.
 
 This package does not reimplement any tracking logic. Every call is a direct
-pass-through to the native SDK — the same install-referrer reading, GAID
-lookup, on-device hashing, and persisted retry queue a pure-Kotlin app gets.
-See `Roas.kt` in the `roas-android-sdk` repo for the actual implementation.
+pass-through to the native SDK for that platform — the same install-referrer
+reading (Android) / ATT+IDFA+ASA+SKAdNetwork handling (iOS), on-device
+hashing, and persisted retry queue a pure-Kotlin or pure-Swift app gets. See
+`Roas.kt` in `sdk-android` and `Roas.swift` in `sdk-ios` for the actual
+implementations.
 
-## ✅ Verified end to end
+## ✅ Verified end to end (Android)
 
 This package was written directly against the real `Roas.kt`/`RoasEvent.kt`
-source, then actually proven on-device, not just compiled:
+source, then actually proven, not just compiled — both on an emulator and on
+a physical device:
 
-- Built a real debug APK (`flutter build apk`) and installed it on an Android
-  emulator.
+- Built and installed a debug APK on an Android **emulator**, then again on a
+  **physical device** (Realme RMX1941, Android 9) over the same LAN as the
+  backend.
 - `initialize()`, `track()`, and `identify()` all confirmed reaching the
-  native plugin via logcat, and the resulting beacons confirmed landing in
-  the Django backend's database (`TouchPoint`/`Event`/`IdentityKey` rows with
-  matching visitor ids).
+  native plugin, and the resulting beacons confirmed landing in the Django
+  backend's database (`TouchPoint`/`Event` rows with matching visitor ids) —
+  on both the emulator run and the physical-device run.
 - Two real bugs were caught and fixed doing this: the example app's
   `AndroidManifest.xml` needed `android:usesCleartextTraffic="true"` (Android
   blocks plain `http://` by default for apps targeting SDK 28+, which
-  silently dropped every beacon to a local `http://10.0.2.2:8000` test
-  backend — this only matters for local testing; production uses HTTPS), and
-  a stale-build caching issue that required `flutter clean` to resolve after
-  an unrelated manifest edit.
+  silently dropped every beacon to a local test backend — this only matters
+  for local testing; production uses HTTPS), and a stale-build caching issue
+  that required `flutter clean` to resolve after an unrelated manifest edit.
 
-What's *not* independently re-verified: iOS (there's no iOS SDK to bridge to
-yet, so this is Android-only by design, not by gap), and a real Play Store
-install (the referrer was empty in this test, as expected for a sideloaded
-`adb install` — see the AAB/Play Console note below for why that's expected,
-not a bug).
+What's *not* yet verified on Android: a real Play Store install (the
+referrer was empty in every test so far, as expected for `adb`/`flutter run`
+installs — see `docs/play-console-testing-flutter.md` in the main repo for
+why that's expected, not a bug, and the runbook for closing that gap), and a
+real RevenueCat purchase (see "RevenueCat wiring" below — the example app is
+wired and builds cleanly, but no RevenueCat account has posted a webhook to
+this backend yet).
+
+## RevenueCat wiring (example app)
+
+`example/` now also configures RevenueCat's own Flutter SDK
+(`purchases_flutter`), threading `Roas.visitorId()` in as `appUserID` so a
+purchase attributes back to the install that drove it — mirrors
+`sample/MainActivity.kt`'s wiring exactly. Confirmed to compile and build a
+debug APK cleanly (`flutter analyze` clean, `flutter build apk --debug`
+succeeds); **not yet run against a real RevenueCat account** — fill in
+`kRevenueCatApiKey` in `example/lib/main.dart` with your project's key once
+you've signed up, then use the "RevenueCat: fetch offerings" / "Buy: ..."
+buttons the same way as the native sample. `minSdk` was bumped to 23 in
+`example/android/app/build.gradle.kts` (RevenueCat's Android SDK floor, same
+bump the native sample needed).
+
+## ⚠️ iOS: bridge written, not yet built or run
+
+The `ios/` bridge (`RoasFlutterPlugin.swift` + `roas_flutter.podspec`) is
+written and mirrors the Android plugin method-for-method, but — unlike
+Android — **it has not been compiled, installed, or run on a device or
+simulator.** It was written on Windows, where there's no Xcode; someone with
+a Mac needs to open the example app in Xcode (once an `example/ios/`
+platform folder exists — see "Running the example app" below) and prove it
+the same way Android already was, before treating iOS as trustworthy the way
+Android now is. Nothing here should be assumed correct just because it
+compiles conceptually against `Roas.swift`'s real signatures — that hasn't
+been checked by an actual Swift compiler yet.
 
 ## Install
 
@@ -60,6 +92,27 @@ also works:
 dependencies:
   roas_flutter:
     path: ../roas-sensor-flutter   # adjust to wherever you place this folder
+```
+
+### iOS-specific setup
+
+`RoasSensor` (the underlying native SDK, from `sdk-ios`) isn't published to a
+resolvable CocoaPods source yet — same pre-publish phase `sdk-android`'s
+Maven coordinate was in before Maven Central landed. Until it is, add an
+explicit source for it to your app's own `ios/Podfile` (`pod install` fails
+with "Unable to find a specification for RoasSensor" otherwise):
+
+```ruby
+# Podfile, local dev against a checked-out sdk-ios:
+pod 'RoasSensor', :path => '../../sdk-ios'   # adjust to wherever you placed it
+```
+
+Also add to `Info.plist`, for the App Tracking Transparency prompt
+`Roas.initialize()` presents by default on first launch:
+
+```xml
+<key>NSUserTrackingUsageDescription</key>
+<string>Used to measure which ads brought you here.</string>
 ```
 
 ## Usage
@@ -96,7 +149,14 @@ await Roas.track('boss_defeated');
 
 `example/` is already a fully scaffolded, working Flutter app (generated via
 `flutter create --platforms=android example`, with the path dependency and
-`android:usesCleartextTraffic="true"` already wired in). To run it yourself:
+`android:usesCleartextTraffic="true"` already wired in), **but Android-only —
+it has no `ios/` platform folder.** To test the iOS bridge, run (on a Mac)
+`flutter create --platforms=ios .` from inside `example/` to add one, then
+follow the "iOS-specific setup" section above for the Podfile/Info.plist
+changes before building. Nobody has done this yet; that's exactly what makes
+the iOS bridge unverified (see above).
+
+To run the existing Android example:
 
 ```bash
 cd example
@@ -119,19 +179,31 @@ verification.
 
 ## Does this give "proper, accurate" tracking data from a Flutter app?
 
-Yes, with one important nuance: **the accuracy is identical to the native SDK's,
-because it IS the native SDK underneath** — install referrer reading, GAID
+**On Android: yes, proven.** The accuracy is identical to the native SDK's,
+because it IS the native SDK underneath — install referrer reading, GAID
 lookup, on-device hashing, and the persisted retry queue are all unchanged;
-this bridge adds no new logic that could degrade accuracy. The only things
-that differ from a pure-Kotlin app:
+this bridge adds no new logic that could degrade accuracy. Confirmed on both
+an emulator and a physical device (see "Verified end to end" above).
 
-- **Timing of `initialize()`**: it must still run as early as possible (ideally
-  before `runApp()`), same as `Application.onCreate()` does natively. Calling
-  it late in a deep widget tree risks missing the earliest events.
-- **iOS is a hard no-op**: if the app also ships iOS, nothing is tracked there
-  until an iOS SDK exists — that's a real, current gap, not a Flutter-specific
-  one. Every method checks `Platform.isAndroid` first and returns cleanly
-  rather than throwing, so an iOS build calling these methods won't crash.
-- **AAB/Play Console testing rules are unchanged**: the install referrer still
-  only works on a real Play Store install (internal testing track), never
-  `flutter run` straight to a device via USB.
+**On iOS: should be, by the same reasoning, but unproven.** The bridge is a
+pass-through to the same real `Roas.swift`/`RoasEvent.swift` — no logic is
+duplicated — but "should behave like the native SDK because it's a thin
+pass-through" was also true of Android before anyone actually ran it, and
+that's exactly when the two real bugs (cleartext traffic, stale build cache)
+turned up. Treat iOS as unverified until someone with a Mac runs it and
+confirms beacons land in the backend, the same way Android was proven.
+
+Other things that differ from a pure-native app on either platform:
+
+- **Timing of `initialize()`**: it must still run as early as possible
+  (ideally before `runApp()`), same as `Application.onCreate()` (Android) /
+  `Roas.configure()` at app start (iOS) do natively. Calling it late in a
+  deep widget tree risks missing the earliest events — including, on iOS,
+  the ATT prompt firing late enough to miss the first-open IDFA window.
+- **AAB/Play Console testing rules are unchanged**: the Android install
+  referrer still only works on a real Play Store install (internal testing
+  track), never `flutter run` straight to a device via USB — see
+  `docs/play-console-testing-flutter.md`.
+- **App Store review**: shipping the ATT prompt means the standard App Store
+  Review Guidelines around tracking transparency apply, same as any native
+  iOS app using IDFA.

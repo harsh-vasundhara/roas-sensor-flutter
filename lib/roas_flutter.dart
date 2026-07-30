@@ -2,16 +2,20 @@ import 'dart:io' show Platform;
 
 import 'package:flutter/services.dart';
 
-/// Flutter bridge for the ROASSensor Android SDK (`com.roassensor.sdk.Roas`).
+/// Flutter bridge for the ROASSensor Android (`com.roassensor.sdk.Roas`) and
+/// iOS (`RoasSensor.Roas`) native SDKs.
 ///
-/// This is Android-only today — there is no iOS SDK yet, so every call here
-/// is a no-op on iOS rather than a crash (checked via [Platform] at the call
-/// site, not hidden inside the channel, so callers can see exactly what
-/// happens on each OS).
+/// Android and iOS both have a native implementation behind this channel;
+/// every other platform (web, desktop) is a no-op rather than a crash
+/// (checked via [Platform] at the call site, not hidden inside the channel,
+/// so callers can see exactly what happens on each OS).
 ///
-/// The wire format matches the native SDK's `/api/tracking/mobile/*`
+/// The wire format matches both native SDKs' `/api/tracking/mobile/*`
 /// beacons exactly — this is a thin bridge, not a reimplementation. See
-/// `Roas.kt` in the `roas-android-sdk` repo for the source of truth.
+/// `Roas.kt` in `sdk-android` and `Roas.swift` in `sdk-ios` for the source of
+/// truth. The iOS side is newly added and, unlike the Android side, has not
+/// yet been proven on-device (no Xcode/macOS available where it was
+/// written) — see the package README before relying on it.
 class Roas {
   Roas._();
 
@@ -30,7 +34,7 @@ class Roas {
     String? customerUserId,
     String? baseUrl,
   }) {
-    if (!Platform.isAndroid) return Future<void>.value();
+    if (!Platform.isAndroid && !Platform.isIOS) return Future<void>.value();
     return _channel.invokeMethod<void>('initialize', {
       'publicKey': publicKey,
       'customerUserId': customerUserId,
@@ -39,11 +43,11 @@ class Roas {
   }
 
   /// The stable visitor id for this install (`null` before [initialize] has
-  /// run, or on any platform other than Android). Pass this to RevenueCat as
-  /// the `appUserID` so a purchase attributes back to this install and its
-  /// ad click.
+  /// run, or on a platform with no native implementation). Pass this to
+  /// RevenueCat as the `appUserID` so a purchase attributes back to this
+  /// install and its ad click.
   static Future<String?> visitorId() {
-    if (!Platform.isAndroid) return Future<String?>.value();
+    if (!Platform.isAndroid && !Platform.isIOS) return Future<String?>.value();
     return _channel.invokeMethod<String?>('visitorId');
   }
 
@@ -56,7 +60,7 @@ class Roas {
     String? phone,
     String? customerUserId,
   }) {
-    if (!Platform.isAndroid) return Future<void>.value();
+    if (!Platform.isAndroid && !Platform.isIOS) return Future<void>.value();
     return _channel.invokeMethod<void>('identify', {
       'email': email,
       'phone': phone,
@@ -64,16 +68,18 @@ class Roas {
     });
   }
 
-  /// Record a funnel/behaviour event — never revenue (see `RoasEvent.kt`:
-  /// money only ever enters through the signed RevenueCat/Stripe webhook).
+  /// Record a funnel/behaviour event — never revenue (see `RoasEvent.kt` /
+  /// `RoasEvent.swift`: money only ever enters through the signed
+  /// RevenueCat/Stripe webhook).
   ///
-  /// [event] should be one of the known keys native `RoasEvent` defines
-  /// (e.g. `"add_to_cart"`, `"begin_checkout"`, `"sign_up"` — see
-  /// [RoasEvent] below for the full list as constants). Anything else is
-  /// sent as a custom event named [event] — matching how the native sample
-  /// app calls `Roas.track(RoasEvent.CUSTOM, name = "...")`.
+  /// [event] should be one of the known keys native `RoasEvent` defines on
+  /// both platforms (e.g. `"add_to_cart"`, `"begin_checkout"`, `"sign_up"` —
+  /// see [RoasEvent] below for the full list as constants). Anything else is
+  /// sent as a custom event named [event] — matching how the native samples
+  /// call `Roas.track(RoasEvent.CUSTOM, name = "...")` (Kotlin) /
+  /// `Roas.track(.custom, name: "...")` (Swift).
   static Future<void> track(String event, {Map<String, Object?>? properties}) {
-    if (!Platform.isAndroid) return Future<void>.value();
+    if (!Platform.isAndroid && !Platform.isIOS) return Future<void>.value();
     return _channel.invokeMethod<void>('track', {
       'event': event,
       'properties': properties,

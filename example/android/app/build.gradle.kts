@@ -19,7 +19,10 @@ android {
         applicationId = "com.roassensor.example"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
-        minSdk = flutter.minSdkVersion
+        // 23, not Flutter's own floor: com.revenuecat.purchases:purchases (pulled
+        // in transitively by purchases_flutter) requires minSdk 23 — same bump
+        // the native Kotlin sample needed for the same reason.
+        minSdk = maxOf(flutter.minSdkVersion, 23)
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
