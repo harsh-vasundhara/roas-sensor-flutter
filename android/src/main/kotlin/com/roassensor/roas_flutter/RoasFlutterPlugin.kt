@@ -3,6 +3,7 @@ package com.roassensor.roas_flutter
 import android.content.Context
 import com.roassensor.sdk.Roas
 import com.roassensor.sdk.RoasEvent
+import com.roassensor.sdk.RoasLogLevel
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
@@ -75,6 +76,24 @@ class RoasFlutterPlugin : FlutterPlugin, MethodCallHandler {
                 } else {
                     Roas.track(RoasEvent.CUSTOM, name = eventKey, properties = properties)
                 }
+                result.success(null)
+            }
+
+            "handleDeepLink" -> {
+                val url = call.argument<String>("url")
+                if (url == null) {
+                    result.error("MISSING_ARG", "url is required", null)
+                    return
+                }
+                Roas.handleDeepLink(url)
+                result.success(null)
+            }
+
+            "setLogLevel" -> {
+                val level = call.argument<String>("level")
+                    ?.let { runCatching { RoasLogLevel.valueOf(it) }.getOrNull() }
+                    ?: RoasLogLevel.ERROR
+                Roas.setLogLevel(level)
                 result.success(null)
             }
 

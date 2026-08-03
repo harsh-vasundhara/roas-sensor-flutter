@@ -85,7 +85,33 @@ class Roas {
       'properties': properties,
     });
   }
+
+  /// Forward a direct deep link (a link that opened the app while it was
+  /// already installed — an Android App Link or an iOS universal link) so
+  /// its `rsclid` attributes this open deterministically. A no-op if [url]
+  /// carries no `rsclid` query parameter. This is *not* the install-referrer
+  /// path (that's automatic on first launch) — it's for a later open.
+  static Future<void> handleDeepLink(String url) {
+    if (!Platform.isAndroid && !Platform.isIOS) return Future<void>.value();
+    return _channel.invokeMethod<void>('handleDeepLink', {'url': url});
+  }
+
+  /// Controls how much the native SDK writes to Logcat (Android) / the
+  /// console (iOS). Defaults to [RoasLogLevel.error] on the native side —
+  /// quiet in a release build, but enough to see a device that can never
+  /// deliver anything. Delivery success/failure was previously invisible
+  /// from Dart entirely; this at least makes it inspectable via the
+  /// device's own native logs while a full Dart-side delivery callback
+  /// (an EventChannel) remains a follow-up, not yet built.
+  static Future<void> setLogLevel(RoasLogLevel level) {
+    if (!Platform.isAndroid && !Platform.isIOS) return Future<void>.value();
+    // Uppercased to match RoasLogLevel's Kotlin/Swift enum case names exactly.
+    return _channel.invokeMethod<void>('setLogLevel', {'level': level.name.toUpperCase()});
+  }
 }
+
+/// Mirrors `RoasLogLevel` in `Roas.kt` / `RoasLogLevel.swift`.
+enum RoasLogLevel { none, error, debug }
 
 /// The known event keys `RoasEvent.kt` defines natively — mirrored here as
 /// plain strings so Dart code gets autocomplete without needing a generated

@@ -52,7 +52,12 @@ android {
 }
 
 dependencies {
-    // Published to Maven Central as of 2026-07-28 — no JitPack repository
-    // needed anymore (see rootProject.allprojects above).
-    implementation 'com.roassensor:roas:0.1.0'
+    // 0.1.0 was published to Maven Central on 2026-07-28. 0.1.1 (the
+    // RoasLogLevel/handleDeepLink/setLogLevel additions) is newer than that
+    // and currently only resolves from mavenLocal() (see
+    // rootProject.allprojects above) — run
+    // `./gradlew :roas:publishToMavenLocal` in sdk-android first. Bump this
+    // back down to 0.1.0, or wait for a real 0.1.1 Central publish, if
+    // that's inconvenient.
+    implementation 'com.roassensor:roas:0.1.1'
 }

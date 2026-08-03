@@ -65,6 +65,30 @@ public class RoasFlutterPlugin: NSObject, FlutterPlugin {
             }
             result(nil)
 
+        case "handleDeepLink":
+            guard
+                let args = call.arguments as? [String: Any],
+                let urlString = args["url"] as? String,
+                let url = URL(string: urlString)
+            else {
+                result(FlutterError(code: "MISSING_ARG", message: "url is required", details: nil))
+                return
+            }
+            Roas.handleDeepLink(url)
+            result(nil)
+
+        case "setLogLevel":
+            let args = call.arguments as? [String: Any]
+            let levelName = (args?["level"] as? String) ?? "ERROR"
+            let level: RoasLogLevel
+            switch levelName {
+            case "NONE": level = .none
+            case "DEBUG": level = .debug
+            default: level = .error
+            }
+            Roas.setLogLevel(level)
+            result(nil)
+
         default:
             result(FlutterMethodNotImplemented)
         }
