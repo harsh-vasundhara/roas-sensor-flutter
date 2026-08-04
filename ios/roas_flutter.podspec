@@ -1,6 +1,6 @@
 Pod::Spec.new do |s|
   s.name             = 'roas_flutter'
-  s.version          = '0.1.0'
+  s.version          = '0.1.2'
   s.summary          = 'Flutter bridge for the ROASSensor iOS tracking SDK.'
   s.description      = <<-DESC
     Thin Flutter bridge to the native RoasSensor iOS SDK (install attribution,

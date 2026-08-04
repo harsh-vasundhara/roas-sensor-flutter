@@ -7,8 +7,8 @@ import 'package:roas_flutter/roas_flutter.dart';
 /// repo — same buttons, same values to fill in, so the two are easy to
 /// compare side by side while testing.
 
-const String kBaseUrl = 'http://10.0.127.242:8000'; // this PC's LAN IP, for the physical device
-const String kPublicKey = '360bd19f-b945-4c44-a410-8f9f14390cce';
+const String kBaseUrl = 'https://footless-hamper-playlist.ngrok-free.dev'; // reachable regardless of network
+const String kPublicKey = '82f5d3c6-cfc6-4016-96ea-39a57b18b767'; // HOP (com.pianohouse)
 
 // RevenueCat's public Google API key for this project (Project settings →
 // API keys). Not the same as kPublicKey above — that one is ours, this one

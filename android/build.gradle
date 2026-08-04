@@ -1,35 +1,68 @@
 group 'com.roassensor.roas_flutter'
-version '0.1.0'
+version '0.1.2'
 
 buildscript {
-    ext.kotlin_version = '1.9.24'
     repositories {
         google()
         mavenCentral()
     }
     dependencies {
         classpath 'com.android.tools.build:gradle:8.5.0'
-        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
+        // No kotlin-gradle-plugin classpath, and no ext.kotlin_version pin.
+        // Under Built-in Kotlin the HOST APP owns the Kotlin version (its
+        // settings.gradle.kts pluginManagement block declares it), so pinning
+        // one here — 1.9.24, as this did — puts a second, older KGP on the same
+        // build as the app's and is exactly what Flutter is deprecating.
     }
 }
 
 rootProject.allprojects {
     repositories {
         google()
-        // com.roassensor:roas is published on Maven Central as of 2026-07-28 —
-        // mavenCentral() alone resolves it, no JitPack/mavenLocal workaround
-        // needed anymore. mavenLocal() is kept ahead of it purely as a local-dev
-        // convenience (e.g. testing an unreleased roas-android-sdk build via
+        // com.roassensor:roas is published on Maven Central — 0.1.0 since
+        // 2026-07-28, 0.1.1 since 2026-08-03, 0.1.2 (device context + the
+        // transient Play-referrer retry) since 2026-08-04. mavenCentral()
+        // alone resolves any of them, no JitPack/mavenLocal workaround needed.
+        // mavenLocal() is kept ahead of it purely as a local-dev convenience
+        // (e.g. testing an unreleased roas-android-sdk build via
         // `./gradlew :roas:publishToMavenLocal`); it's a no-op fallthrough to
-        // mavenCentral() for everyone else since nothing is normally published
-        // to ~/.m2.
+        // mavenCentral() for everyone else since nothing is normally
+        // published to ~/.m2.
         mavenLocal()
         mavenCentral()
     }
 }
 
 apply plugin: 'com.android.library'
-apply plugin: 'kotlin-android'
+
+// Built-in Kotlin (Flutter 3.44+). AGP 9 applies the Kotlin plugin itself, so a
+// plugin that also applies it double-applies KGP — the thing the build warns
+// about and that "future versions of Flutter will fail to build".
+//
+// The apply stays CONDITIONAL rather than being deleted outright, because the
+// host app's AGP version is independent of its Flutter version: a consumer on
+// Flutter 3.44 can still be on AGP 8, where nothing would apply Kotlin for us
+// and every .kt file in this bridge would simply not compile.
+//
+// The condition keys off `android.builtInKotlin`, which is the flag that
+// actually decides whether anything else applies Kotlin for us. Two more
+// obvious conditions were tried and both are wrong:
+//
+//   • `agpMajor < 9` (what the migration guide suggests) — AGP 9 only applies
+//     Kotlin when builtInKotlin=true, and Flutter's app template still ships
+//     that flag FALSE. On AGP 9 + false the apply is skipped, nothing supplies
+//     Kotlin, and evaluation dies on the `kotlin {}` block below.
+//   • `!plugins.hasPlugin('org.jetbrains.kotlin.android')` — built-in Kotlin
+//     has not applied KGP yet at the point this script body runs, so the check
+//     reads false, we apply anyway, and AGP 9 rejects it with "no longer
+//     required for Kotlin support since AGP 9.0".
+//
+// The hasPlugin guard is kept as a second condition purely against a
+// double-apply in a setup that did get there first.
+def builtInKotlin = (project.findProperty('android.builtInKotlin') ?: 'false').toString().toBoolean()
+if (!builtInKotlin && !project.plugins.hasPlugin('org.jetbrains.kotlin.android')) {
+    apply plugin: 'kotlin-android'
+}
 
 android {
     namespace 'com.roassensor.roas_flutter'
@@ -43,21 +76,31 @@ android {
     }
 
     compileOptions {
-        sourceCompatibility JavaVersion.VERSION_1_8
-        targetCompatibility JavaVersion.VERSION_1_8
+        // 17, matching the example app and Flutter's own template. The old 1.8
+        // was what produced the "source value 8 is obsolete" warnings, and it
+        // cannot stay: AGP fails the build outright when the Java and Kotlin
+        // JVM targets disagree, and the Kotlin side must be 17 below.
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
     }
-    kotlinOptions {
-        jvmTarget = '1.8'
+}
+
+// Replaces the `kotlinOptions` block, which Built-in Kotlin removes. This is
+// the KGP 2.x DSL, hence the Flutter 3.44 / Dart 3.12 floor in pubspec.yaml.
+//
+// Deferred with withId rather than called straight: whoever applies Kotlin —
+// us above, or AGP's built-in support — the `kotlin` extension only exists
+// afterwards, and calling it at script-body time fails with "Could not find
+// method kotlin()" on the very configuration this migration is meant to fix.
+plugins.withId('org.jetbrains.kotlin.android') {
+    kotlin {
+        compilerOptions {
+            jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17
+        }
     }
 }
 
 dependencies {
-    // 0.1.0 was published to Maven Central on 2026-07-28. 0.1.1 (the
-    // RoasLogLevel/handleDeepLink/setLogLevel additions) is newer than that
-    // and currently only resolves from mavenLocal() (see
-    // rootProject.allprojects above) — run
-    // `./gradlew :roas:publishToMavenLocal` in sdk-android first. Bump this
-    // back down to 0.1.0, or wait for a real 0.1.1 Central publish, if
-    // that's inconvenient.
-    implementation 'com.roassensor:roas:0.1.1'
+    // Live on Maven Central as of 2026-08-04 — no local publish needed.
+    implementation 'com.roassensor:roas:0.1.2'
 }
