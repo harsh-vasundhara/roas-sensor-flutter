@@ -8,18 +8,41 @@ import 'package:roas_flutter/roas_flutter.dart';
 /// compare side by side while testing.
 
 const String kBaseUrl = 'https://footless-hamper-playlist.ngrok-free.dev'; // reachable regardless of network
-const String kPublicKey = '82f5d3c6-cfc6-4016-96ea-39a57b18b767'; // HOP (com.pianohouse)
+// "ROAS Flutter Sample" — this app's OWN site, deliberately not HOP's. Sharing
+// HOP's key put sample-app installs inside HOP's retention, fraud and ROAS
+// numbers, which is exactly the data the beta exists to read.
+const String kPublicKey = '4709392e-486c-4d1f-b79f-50c9a39f515b';
 
 // RevenueCat's public Google API key for this project (Project settings →
 // API keys). Not the same as kPublicKey above — that one is ours, this one
 // is RevenueCat's.
 const String kRevenueCatApiKey = 'test_FzaGVLRLGebnvdQzbrWpjQxAKiR';
 
+/// Beacon signing secret — Setup → your app → Beacon signing → "Generate".
+///
+/// Read from the build environment rather than written here as a literal, so it
+/// never lands in source control:
+///
+///     flutter run          --dart-define=ROAS_APP_SECRET=xxxxx
+///     flutter build appbundle --dart-define=ROAS_APP_SECRET=xxxxx
+///
+/// Empty (the default) means beacons go out unsigned, which the collector still
+/// accepts until "reject unsigned beacons" is switched on for the site — so
+/// forgetting the flag degrades to today's behaviour rather than breaking.
+const String kAppSecret = String.fromEnvironment('ROAS_APP_SECRET');
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   // This reports the install (first launch) and flushes any queued beacons.
-  await Roas.initialize(publicKey: kPublicKey, baseUrl: kBaseUrl);
+  await Roas.initialize(
+    publicKey: kPublicKey,
+    baseUrl: kBaseUrl,
+    // Empty → null: an empty-string secret would make the SDK sign with a key
+    // of "", producing a signature the server computes differently and rejects
+    // outright as INVALID. Absent must mean absent.
+    appSecret: kAppSecret.isEmpty ? null : kAppSecret,
+  );
 
   // appUserID = our vid, so the purchase RevenueCat's webhook reports later
   // carries the exact visitor whose ad click drove the install.
@@ -50,7 +73,18 @@ class RoasSamplePage extends StatefulWidget {
 }
 
 class _RoasSamplePageState extends State<RoasSamplePage> {
-  final List<String> _log = ['ROASSensor Flutter sample', 'baseUrl: $kBaseUrl', ''];
+  // Signing state is shown on screen, not just in the log, because the whole
+  // failure mode it guards against is invisible: an unsigned build looks
+  // identical to a signed one from the device, and the difference only shows up
+  // as beacons silently 401ing once the site enforces.
+  final List<String> _log = [
+    'ROASSensor Flutter sample',
+    'baseUrl: $kBaseUrl',
+    kAppSecret.isEmpty
+        ? 'signing: OFF (pass --dart-define=ROAS_APP_SECRET=… to enable)'
+        : 'signing: ON (secret ${kAppSecret.length} chars)',
+    '',
+  ];
   List<Package> _packages = [];
 
   Future<void> _append(String line) async {

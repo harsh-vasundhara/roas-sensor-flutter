@@ -26,10 +26,20 @@ public class RoasFlutterPlugin: NSObject, FlutterPlugin {
                 return
             }
             let customerUserId = args["customerUserId"] as? String
+            let appSecret = args["appSecret"] as? String
             if let baseUrl = args["baseUrl"] as? String {
-                Roas.configure(publicKey: publicKey, customerUserId: customerUserId, baseUrl: baseUrl)
+                Roas.configure(
+                    publicKey: publicKey,
+                    customerUserId: customerUserId,
+                    baseUrl: baseUrl,
+                    appSecret: appSecret
+                )
             } else {
-                Roas.configure(publicKey: publicKey, customerUserId: customerUserId)
+                Roas.configure(
+                    publicKey: publicKey,
+                    customerUserId: customerUserId,
+                    appSecret: appSecret
+                )
             }
             result(nil)
 

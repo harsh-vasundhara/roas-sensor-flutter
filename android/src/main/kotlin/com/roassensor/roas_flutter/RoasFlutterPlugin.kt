@@ -40,10 +40,29 @@ class RoasFlutterPlugin : FlutterPlugin, MethodCallHandler {
                 }
                 val customerUserId = call.argument<String>("customerUserId")
                 val baseUrl = call.argument<String>("baseUrl")
+                val appSecret = call.argument<String>("appSecret")
+                // NAMED arguments, not positional. These used to be positional,
+                // which meant a new parameter added anywhere but the end of
+                // Roas.initialize() silently rebound every one of them by a slot
+                // — and still compiled, because the types line up. The result was
+                // beacons signed with the customer's user id and posted to the
+                // production host instead of the configured one. Named arguments
+                // make that class of break a compile error instead of a mystery.
                 if (baseUrl != null) {
-                    Roas.initialize(appContext, publicKey, customerUserId, baseUrl)
+                    Roas.initialize(
+                        context = appContext,
+                        publicKey = publicKey,
+                        customerUserId = customerUserId,
+                        baseUrl = baseUrl,
+                        appSecret = appSecret,
+                    )
                 } else {
-                    Roas.initialize(appContext, publicKey, customerUserId)
+                    Roas.initialize(
+                        context = appContext,
+                        publicKey = publicKey,
+                        customerUserId = customerUserId,
+                        appSecret = appSecret,
+                    )
                 }
                 result.success(null)
             }

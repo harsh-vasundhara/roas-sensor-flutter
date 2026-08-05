@@ -29,16 +29,26 @@ class Roas {
   /// Setup page. [baseUrl] overrides the collector host (defaults to
   /// production on the native side). [customerUserId] is your own user id if
   /// already known at launch.
+  /// [appSecret] is this property's beacon signing secret (Setup → your app →
+  /// Beacon signing). Optional: without it beacons go unsigned, which the
+  /// collector accepts until you turn on "reject unsigned beacons". It is NOT a
+  /// revenue credential — that is the server-side api key, which must never
+  /// ship inside an app. The worst an extracted one allows is forging beacons,
+  /// which the public key alone already allowed, and rotating it invalidates
+  /// every build carrying the old one. Prefer `--dart-define` over a literal so
+  /// it stays out of source control.
   static Future<void> initialize({
     required String publicKey,
     String? customerUserId,
     String? baseUrl,
+    String? appSecret,
   }) {
     if (!Platform.isAndroid && !Platform.isIOS) return Future<void>.value();
     return _channel.invokeMethod<void>('initialize', {
       'publicKey': publicKey,
       'customerUserId': customerUserId,
       'baseUrl': baseUrl,
+      'appSecret': appSecret,
     });
   }
 

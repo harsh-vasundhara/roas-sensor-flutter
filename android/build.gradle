@@ -1,5 +1,5 @@
 group 'com.roassensor.roas_flutter'
-version '0.1.2'
+version '0.1.3'
 
 buildscript {
     repositories {
@@ -101,6 +101,28 @@ plugins.withId('org.jetbrains.kotlin.android') {
 }
 
 dependencies {
-    // Live on Maven Central as of 2026-08-04 — no local publish needed.
-    implementation 'com.roassensor:roas:0.1.2'
+    // 0.1.3 adds, over 0.1.2: Play Services version, App Set ID, the raw
+    // referrer click/install timestamps, beacon signing, sessions (session id +
+    // number + foreground engagement) and emulator/root signals. All of them
+    // ride the install beacon automatically — the only one needing a Dart-side
+    // argument is the signing secret.
+    implementation 'com.roassensor:roas:0.1.3'
+
+    // Android App Set ID — the ONLY source of `app_set_id`, which backs
+    // duplicate-install / device-farm detection. The SDK reads it reflectively
+    // and degrades to null when the class is absent, so without this line the
+    // field is permanently blank and that whole feature is inert.
+    //
+    // Declared HERE rather than in roas-android-sdk on purpose. The native SDK
+    // keeps Play Services `compileOnly` so a pure-Kotlin app is never forced to
+    // carry a dependency it didn't ask for. A Flutter app is a different
+    // audience — it wants the plugin to work out of the box — and this artifact
+    // is small with no meaningful transitive weight. Pure-Kotlin consumers add
+    // the same line themselves if they want the field.
+    //
+    // NOT an ads dependency, and it must not be used as one: Google permits the
+    // App Set ID for analytics and fraud prevention and forbids it for ads
+    // measurement. That is why the backend salts the hash and never makes it an
+    // IdentityKey.
+    implementation 'com.google.android.gms:play-services-appset:16.1.0'
 }
