@@ -13,6 +13,14 @@ public class RoasFlutterPlugin: NSObject, FlutterPlugin {
         let channel = FlutterMethodChannel(name: "roas_flutter", binaryMessenger: registrar.messenger())
         let instance = RoasFlutterPlugin()
         registrar.addMethodCallDelegate(instance, channel: channel)
+
+        // Delivery results are pushed, not requested — a beacon queued on a
+        // previous offline launch is flushed during configure, with nothing in
+        // Dart awaiting it — so they need a stream, not a method result.
+        let delivery = FlutterEventChannel(
+            name: "roas_flutter/delivery", binaryMessenger: registrar.messenger()
+        )
+        delivery.setStreamHandler(RoasDeliveryStreamHandler())
     }
 
     public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
@@ -27,24 +35,54 @@ public class RoasFlutterPlugin: NSObject, FlutterPlugin {
             }
             let customerUserId = args["customerUserId"] as? String
             let appSecret = args["appSecret"] as? String
+            // Defaults to true to match Roas.configure, so an app that never
+            // passes the flag behaves exactly as before.
+            let ask = args["requestTrackingAuthorization"] as? Bool ?? true
             if let baseUrl = args["baseUrl"] as? String {
                 Roas.configure(
                     publicKey: publicKey,
                     customerUserId: customerUserId,
-                    baseUrl: baseUrl,
-                    appSecret: appSecret
+                    requestTrackingAuthorization: ask,
+                    appSecret: appSecret,
+                    baseUrl: baseUrl
                 )
             } else {
                 Roas.configure(
                     publicKey: publicKey,
                     customerUserId: customerUserId,
+                    requestTrackingAuthorization: ask,
                     appSecret: appSecret
                 )
             }
             result(nil)
 
+        case "requestTracking":
+            // Answers only once ATT has resolved, so Dart can await the prompt
+            // and know the IDFA binding has been attempted before continuing.
+            Roas.requestTrackingAuthorization { result(nil) }
+
+        case "updateConversionValue":
+            guard
+                let args = call.arguments as? [String: Any],
+                let value = args["value"] as? Int
+            else {
+                result(FlutterError(code: "MISSING_ARG", message: "value is required", details: nil))
+                return
+            }
+            Roas.updateConversionValue(
+                value,
+                coarse: args["coarse"] as? String,
+                lockWindow: args["lockWindow"] as? Bool ?? false
+            )
+            result(nil)
+
         case "visitorId":
             result(Roas.visitorId())
+
+        case "appAccountToken":
+            // Handed to StoreKit on a purchase so the App Store Server
+            // Notification carries it back and the backend can rebuild the vid.
+            result(Roas.appAccountToken()?.uuidString)
 
         case "identify":
             let args = call.arguments as? [String: Any]
@@ -102,5 +140,42 @@ public class RoasFlutterPlugin: NSObject, FlutterPlugin {
         default:
             result(FlutterMethodNotImplemented)
         }
+    }
+}
+
+/// Feeds `Roas.setOnDeliveryResult` into the `roas_flutter/delivery`
+/// EventChannel, mirroring `RoasFlutterPlugin.kt`'s StreamHandler.
+///
+/// The native callback is a process-wide singleton, so it is cleared on cancel:
+/// left pointing at a torn-down engine's sink it would leak the engine and fire
+/// into a dead channel on the first delivery after a hot restart.
+private class RoasDeliveryStreamHandler: NSObject, FlutterStreamHandler {
+    private var sink: FlutterEventSink?
+
+    func onListen(
+        withArguments arguments: Any?, eventSink events: @escaping FlutterEventSink
+    ) -> FlutterError? {
+        sink = events
+        Roas.setOnDeliveryResult { [weak self] path, success, error in
+            // Transport delivers off the main thread; a FlutterEventSink must be
+            // invoked on it, and breaking that crashes rather than misbehaves.
+            DispatchQueue.main.async {
+                self?.sink?([
+                    "path": path,
+                    "success": success,
+                    // NSNull, not `error as Any` — the latter boxes a nil
+                    // Optional, which FlutterStandardWriter cannot encode.
+                    // NSNull crosses cleanly and arrives in Dart as null.
+                    "error": error ?? NSNull(),
+                ])
+            }
+        }
+        return nil
+    }
+
+    func onCancel(withArguments arguments: Any?) -> FlutterError? {
+        Roas.setOnDeliveryResult(nil)
+        sink = nil
+        return nil
     }
 }

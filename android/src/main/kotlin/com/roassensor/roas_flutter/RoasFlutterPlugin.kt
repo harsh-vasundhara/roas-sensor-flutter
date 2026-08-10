@@ -1,10 +1,13 @@
 package com.roassensor.roas_flutter
 
 import android.content.Context
+import android.os.Handler
+import android.os.Looper
 import com.roassensor.sdk.Roas
 import com.roassensor.sdk.RoasEvent
 import com.roassensor.sdk.RoasLogLevel
 import io.flutter.embedding.engine.plugins.FlutterPlugin
+import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler
@@ -18,16 +21,49 @@ import io.flutter.plugin.common.MethodChannel.Result
  */
 class RoasFlutterPlugin : FlutterPlugin, MethodCallHandler {
     private lateinit var channel: MethodChannel
+    private lateinit var deliveryChannel: EventChannel
     private lateinit var appContext: Context
+
+    /// Dart's listener, and the handler that feeds it. Held so it can be
+    /// detached: the native SDK's callback is a process-wide singleton, and
+    /// leaving it pointing at a dead engine's sink leaks the engine and throws
+    /// on the first delivery after a hot restart.
+    private var deliverySink: EventChannel.EventSink? = null
+    private val mainHandler = Handler(Looper.getMainLooper())
 
     override fun onAttachedToEngine(binding: FlutterPlugin.FlutterPluginBinding) {
         appContext = binding.applicationContext
         channel = MethodChannel(binding.binaryMessenger, "roas_flutter")
         channel.setMethodCallHandler(this)
+
+        deliveryChannel = EventChannel(binding.binaryMessenger, "roas_flutter/delivery")
+        deliveryChannel.setStreamHandler(object : EventChannel.StreamHandler {
+            override fun onListen(arguments: Any?, events: EventChannel.EventSink?) {
+                deliverySink = events
+                Roas.setOnDeliveryResult { path, success, error ->
+                    // Transport delivers on its own executor; a platform channel
+                    // may only be touched from the main thread, and violating
+                    // that crashes rather than misbehaves.
+                    mainHandler.post {
+                        deliverySink?.success(
+                            mapOf("path" to path, "success" to success, "error" to error)
+                        )
+                    }
+                }
+            }
+
+            override fun onCancel(arguments: Any?) {
+                Roas.setOnDeliveryResult(null)
+                deliverySink = null
+            }
+        })
     }
 
     override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {
         channel.setMethodCallHandler(null)
+        deliveryChannel.setStreamHandler(null)
+        Roas.setOnDeliveryResult(null)
+        deliverySink = null
     }
 
     override fun onMethodCall(call: MethodCall, result: Result) {
@@ -68,6 +104,23 @@ class RoasFlutterPlugin : FlutterPlugin, MethodCallHandler {
             }
 
             "visitorId" -> result.success(Roas.visitorId())
+
+            // iOS-only concept: StoreKit's appAccountToken must be a UUID, so the
+            // iOS SDK derives one from the vid. Play Billing has no such
+            // constraint — its obfuscatedAccountId takes the visitor id verbatim —
+            // so Android answers null and callers use visitorId() there. Handled
+            // explicitly rather than falling through to notImplemented(), which
+            // would surface as a MissingPluginException on a perfectly valid call.
+            "appAccountToken" -> result.success(null)
+
+            // Both iOS-only, and both answered rather than left to
+            // notImplemented(): Dart guards them with Platform.isIOS, but a
+            // MissingPluginException from a method the plugin genuinely has is a
+            // confusing way to say "not applicable here". ATT and SKAdNetwork
+            // have no Android equivalent — Android's consent story is the AD_ID
+            // permission, which is a manifest concern, not a runtime one.
+            "requestTracking" -> result.success(null)
+            "updateConversionValue" -> result.success(null)
 
             "identify" -> {
                 Roas.identify(

@@ -20,6 +20,41 @@ class Roas {
   Roas._();
 
   static const MethodChannel _channel = MethodChannel('roas_flutter');
+  static const EventChannel _deliveryChannel =
+      EventChannel('roas_flutter/delivery');
+  static Stream<RoasDeliveryResult>? _deliveryStream;
+
+  /// Every beacon delivery attempt, success or failure.
+  ///
+  /// An EventChannel rather than a callback argument because deliveries happen
+  /// on the native side long after any Dart call returned — a queued beacon from
+  /// a previous offline launch is flushed during `initialize`, and nothing in
+  /// Dart is waiting on it.
+  ///
+  /// Most apps do not need this. It exists because without it a Flutter app that
+  /// silently delivers nothing looks exactly like one with no traffic, and lost
+  /// beacons are lost touchpoints — which means credit assigned to the wrong
+  /// touch, or to none. Wire it to a debug banner in a QA build, or forward it
+  /// to your own crash reporting.
+  ///
+  /// Broadcast and lazily created, so several listeners share one native
+  /// subscription. Empty on platforms with no native implementation.
+  static Stream<RoasDeliveryResult> get onDeliveryResult {
+    if (!Platform.isAndroid && !Platform.isIOS) {
+      return const Stream<RoasDeliveryResult>.empty();
+    }
+    return _deliveryStream ??= _deliveryChannel
+        .receiveBroadcastStream()
+        .map((dynamic event) {
+          final map = (event as Map).cast<Object?, Object?>();
+          return RoasDeliveryResult(
+            path: map['path'] as String? ?? '',
+            success: map['success'] as bool? ?? false,
+            error: map['error'] as String?,
+          );
+        })
+        .asBroadcastStream();
+  }
 
   /// Start the SDK. Call once, as early as possible — e.g. in `main()`
   /// before `runApp()`. Idempotent on the native side: a second call is a
@@ -37,11 +72,20 @@ class Roas {
   /// which the public key alone already allowed, and rotating it invalidates
   /// every build carrying the old one. Prefer `--dart-define` over a literal so
   /// it stays out of source control.
+  /// [requestTrackingAuthorization] (**iOS only**) controls whether the App
+  /// Tracking Transparency prompt is shown on first launch. Leave it true and
+  /// the prompt appears ~0.6s after this call — a cold-start system alert,
+  /// before the user has seen anything worth trusting the app with, which is the
+  /// classic way to depress opt-in. Every denial costs the IDFA, the strongest
+  /// identity key an iOS install can carry. Pass false and call
+  /// [requestTracking] yourself after a priming screen; the SDK binds the IDFA
+  /// at that point either way, so deferring costs nothing.
   static Future<void> initialize({
     required String publicKey,
     String? customerUserId,
     String? baseUrl,
     String? appSecret,
+    bool requestTrackingAuthorization = true,
   }) {
     if (!Platform.isAndroid && !Platform.isIOS) return Future<void>.value();
     return _channel.invokeMethod<void>('initialize', {
@@ -49,6 +93,49 @@ class Roas {
       'customerUserId': customerUserId,
       'baseUrl': baseUrl,
       'appSecret': appSecret,
+      'requestTrackingAuthorization': requestTrackingAuthorization,
+    });
+  }
+
+  /// **iOS only** — show the ATT prompt now, and bind the IDFA if granted.
+  /// A no-op on Android. Pair with
+  /// `initialize(requestTrackingAuthorization: false)`.
+  ///
+  /// Calling this long after the install was reported is fine and is the point:
+  /// the install beacon went out with no advertising id, so on a grant the SDK
+  /// binds the IDFA through `/identify`, minting the same identity key the
+  /// install beacon would have. Safe to call more than once — once the user has
+  /// answered, iOS returns the stored answer without re-prompting.
+  static Future<void> requestTracking() {
+    if (!Platform.isIOS) return Future<void>.value();
+    return _channel.invokeMethod<void>('requestTracking');
+  }
+
+  /// **iOS only** — report a SKAdNetwork conversion value. A no-op on Android.
+  ///
+  /// For a user who denied ATT — most of them — SKAN is the *only* channel that
+  /// tells the ad network the install converted, so leaving this uncalled means
+  /// the network has nothing to optimise against and your own SKAN lane records
+  /// installs with no events.
+  ///
+  /// [value] is the fine value, 0–63; its meaning is the site's SKAN schema,
+  /// which lives server-side so it can be retuned without an app release.
+  /// [coarse] is `'low'`, `'medium'` or `'high'` — **send it**: below Apple's
+  /// install-volume privacy threshold the fine value is withheld entirely and
+  /// coarse is all that survives the postback, so fine-only reporting goes dark
+  /// on exactly the small campaigns that most need measuring. [lockWindow] posts
+  /// immediately and discards every later conversion — only when the value is
+  /// final.
+  static Future<void> updateConversionValue(
+    int value, {
+    String? coarse,
+    bool lockWindow = false,
+  }) {
+    if (!Platform.isIOS) return Future<void>.value();
+    return _channel.invokeMethod<void>('updateConversionValue', {
+      'value': value,
+      'coarse': coarse,
+      'lockWindow': lockWindow,
     });
   }
 
@@ -59,6 +146,37 @@ class Roas {
   static Future<String?> visitorId() {
     if (!Platform.isAndroid && !Platform.isIOS) return Future<String?>.value();
     return _channel.invokeMethod<String?>('visitorId');
+  }
+
+  /// **iOS only** — a UUID derived from the visitor id, to hand StoreKit as the
+  /// purchase's `appAccountToken`. Returns null on Android and before
+  /// [initialize].
+  ///
+  /// This is what ties a native App Store purchase back to the install that
+  /// drove it: the App Store Server Notification carries the token, and the
+  /// backend reconstructs the vid from it. Without it, a Flutter app buying
+  /// through `in_app_purchase` (Flutter's own IAP plugin, which is StoreKit —
+  /// not RevenueCat) has no path at all from an iOS sale to its ad click, so the
+  /// revenue lands UNATTRIBUTED while the spend still counts and iOS ROAS reads
+  /// low enough to kill a working campaign.
+  ///
+  /// ```dart
+  /// final token = await Roas.appAccountToken();
+  /// await InAppPurchase.instance.buyConsumable(
+  ///   purchaseParam: AppStorePurchaseParam(
+  ///     productDetails: product,
+  ///     applicationUserName: token, // iOS: becomes appAccountToken
+  ///   ),
+  /// );
+  /// ```
+  ///
+  /// Not needed with RevenueCat — that path uses [visitorId] as the `appUserID`
+  /// instead. **Android's analogue is [visitorId] itself**: pass it to Play
+  /// Billing as `obfuscatedAccountId` and the Play webhook resolves it the same
+  /// way.
+  static Future<String?> appAccountToken() {
+    if (!Platform.isAndroid && !Platform.isIOS) return Future<String?>.value();
+    return _channel.invokeMethod<String?>('appAccountToken');
   }
 
   /// Bind the user's identity. At least one of [email]/[phone] must be
@@ -122,6 +240,28 @@ class Roas {
 
 /// Mirrors `RoasLogLevel` in `Roas.kt` / `RoasLogLevel.swift`.
 enum RoasLogLevel { none, error, debug }
+
+/// One beacon delivery attempt, from [Roas.onDeliveryResult].
+class RoasDeliveryResult {
+  const RoasDeliveryResult({
+    required this.path,
+    required this.success,
+    this.error,
+  });
+
+  /// The endpoint, e.g. `/api/tracking/mobile/first-open`.
+  final String path;
+  final bool success;
+
+  /// Null on success. Note that a beacon which fails here is not necessarily
+  /// lost — the native queue is persisted and retries on a later launch.
+  final String? error;
+
+  @override
+  String toString() => success
+      ? 'RoasDeliveryResult($path, ok)'
+      : 'RoasDeliveryResult($path, failed: $error)';
+}
 
 /// The known event keys `RoasEvent.kt` defines natively — mirrored here as
 /// plain strings so Dart code gets autocomplete without needing a generated

@@ -1,5 +1,5 @@
 group 'com.roassensor.roas_flutter'
-version '0.1.3'
+version '0.1.4'
 
 buildscript {
     repositories {
@@ -106,7 +106,36 @@ dependencies {
     // number + foreground engagement) and emulator/root signals. All of them
     // ride the install beacon automatically — the only one needing a Dart-side
     // argument is the signing secret.
-    implementation 'com.roassensor:roas:0.1.3'
+    // 0.1.4 fixes two things that only a host like Flutter or a minified build
+    // could hit: the activity counter that stopped firing onEnterForeground when
+    // the SDK is started after the first activity (which is every Flutter app —
+    // Dart main() runs inside FlutterActivity.onStart), and the missing R8 keep
+    // rules that blanked app_set_id in every release build.
+    implementation 'com.roassensor:roas:0.1.4'
+
+    // GAID (advertising id) — the ONLY source of `device_id` on Android, which
+    // is the strongest identity key an install can carry and what every
+    // GAID-keyed CAPI match resolves against.
+    //
+    // The native SDK declares this `compileOnly` (roas/build.gradle.kts) so a
+    // pure-Kotlin app is never forced to carry Play Services, and `DeviceId`
+    // reads the class reflectively — which means an absent classpath entry is
+    // indistinguishable at runtime from the user opting out of ad tracking. It
+    // simply returns null. So without this line a Flutter app reported NO ad id
+    // at all and nothing said so: no crash, no log, just a quietly weaker
+    // identity graph. Whether it worked was an accident of whether the host app
+    // happened to pull the artifact in transitively (Firebase and AdMob do; a
+    // plain Flutter app does not).
+    //
+    // Declared HERE for the same reason as the App Set ID below: a Flutter app
+    // is a different audience from a Kotlin one and wants the plugin to work out
+    // of the box. Pure-Kotlin consumers still add the line themselves.
+    //
+    // The `com.google.android.gms.permission.AD_ID` permission this needs on
+    // Android 12+ already ships in the native SDK's own manifest and arrives by
+    // manifest merge; an app that would rather have no ad id removes it with
+    // `tools:node="remove"` and the SDK degrades to referrer-only.
+    implementation 'com.google.android.gms:play-services-ads-identifier:18.0.1'
 
     // Android App Set ID — the ONLY source of `app_set_id`, which backs
     // duplicate-install / device-farm detection. The SDK reads it reflectively

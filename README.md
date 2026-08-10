@@ -145,6 +145,68 @@ custom event under that exact name, matching how the native sample app calls
 await Roas.track('boss_defeated');
 ```
 
+### Binding a purchase to the install (do this, or iOS revenue is orphaned)
+
+Attribution needs the purchase to carry an id we can resolve back to the
+install. Which id depends on how you take payment:
+
+```dart
+// RevenueCat (either platform) — the visitor id IS the appUserID
+await Purchases.configure(PurchasesConfiguration(key)..appUserID = await Roas.visitorId());
+
+// StoreKit via in_app_purchase (iOS)
+final token = await Roas.appAccountToken();      // null on Android
+
+// Play Billing via in_app_purchase (Android) — the raw visitor id
+final accountId = await Roas.visitorId();        // → obfuscatedAccountId
+```
+
+Skip this and the sale arrives with nothing tying it to an ad click: the
+revenue lands unattributed while the spend still counts, so ROAS reads *low*
+and the campaign looks dead when it isn't.
+
+### iOS: ATT timing
+
+The prompt fires ~0.6s after `initialize` by default — a cold-start system
+alert, before the user has seen anything worth trusting the app with, which is
+the classic way to depress opt-in. Every denial costs the IDFA. To ask at a
+better moment:
+
+```dart
+await Roas.initialize(publicKey: key, requestTrackingAuthorization: false);
+// ...after your own priming screen:
+await Roas.requestTracking();
+```
+
+Deferring costs nothing: the install beacon goes out without an advertising id,
+and on a grant the SDK binds the IDFA through `/identify`, minting the same
+identity key the install beacon would have carried.
+
+### iOS: SKAdNetwork conversion values
+
+For a user who denied ATT — most of them — SKAN is the *only* channel that tells
+the ad network the install converted. Call this on your key events:
+
+```dart
+await Roas.updateConversionValue(12, coarse: 'high');
+```
+
+`value` is 0–63 and its meaning is your site's SKAN schema, held server-side so
+it can be retuned without an app release. **Send `coarse` too**: below Apple's
+install-volume privacy threshold the fine value is withheld entirely and coarse
+is all that survives the postback, so fine-only reporting goes dark on exactly
+the small campaigns that most need measuring.
+
+### Watching deliveries
+
+```dart
+Roas.onDeliveryResult.listen((r) => debugPrint('$r'));
+```
+
+Most apps don't need it. It exists because an app that silently delivers nothing
+looks identical to one with no traffic, and lost beacons mean credit assigned to
+the wrong touch or to none.
+
 ## Running the example app
 
 `example/` is already a fully scaffolded, working Flutter app (generated via
