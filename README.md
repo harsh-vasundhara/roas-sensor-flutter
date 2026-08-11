@@ -96,6 +96,26 @@ dependencies:
 
 ### iOS-specific setup
 
+**Set your deployment target to 14.0 first.** This bites every new Flutter app,
+because Flutter's template ships the platform line commented out and CocoaPods
+then defaults to iOS 13, while this plugin requires 14. In `ios/Podfile`:
+
+```ruby
+platform :ios, '14.0'   # uncomment this line — the template leaves it off
+```
+
+The error, if you skip it, names the plugin but not the fix:
+
+```
+[!] CocoaPods could not find compatible versions for pod "roas_flutter":
+    ... they required a higher minimum deployment target.
+```
+
+Raise the **Runner target** to 14.0 as well (Xcode → Runner → General →
+Minimum Deployments). That is a separate setting from the Podfile's, so fixing
+only the Podfile clears the `pod install` failure and then fails again during
+the build with the same complaint from the app target.
+
 `RoasSensor` (the underlying native SDK, from `sdk-ios`) isn't published to a
 resolvable CocoaPods source yet — same pre-publish phase `sdk-android`'s
 Maven coordinate was in before Maven Central landed. Until it is, add an
