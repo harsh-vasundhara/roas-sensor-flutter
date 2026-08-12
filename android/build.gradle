@@ -111,7 +111,22 @@ dependencies {
     // the SDK is started after the first activity (which is every Flutter app —
     // Dart main() runs inside FlutterActivity.onStart), and the missing R8 keep
     // rules that blanked app_set_id in every release build.
-    implementation 'com.roassensor:roas:0.1.4'
+    // 0.1.5 is a batch from a live testing pass of this Flutter bridge (real
+    // emulator + a Nokia + a Vivo V2130, plus a real ad click):
+    //   * handleDeepLink was dropping every query param except rsclid
+    //     (utm_source/rs_campaign/etc. never reached the backend) and outright
+    //     refusing a link using a non-rsclid click id (gclid/fbclid) instead.
+    //   * an OEM data-retention issue where the Vivo kept resurrecting its old
+    //     vid/installReported across real uninstall+reinstall cycles, plus a
+    //     beacon-queue race and a stale-queue leak that fix exposed.
+    //   * a best-effort deferred-link attribution probe for already-installed
+    //     users who tap an ad — nothing previously called that backend
+    //     endpoint outside of a fresh install.
+    //   * a fallback for installs from non-Play-Store OEM app stores (Vivo,
+    //     Xiaomi, Huawei, Samsung, Amazon) via the legacy INSTALL_REFERRER
+    //     broadcast — the Play Install Referrer API alone answers
+    //     FEATURE_NOT_SUPPORTED for those and nothing else.
+    implementation 'com.roassensor:roas:0.1.5'
 
     // GAID (advertising id) — the ONLY source of `device_id` on Android, which
     // is the strongest identity key an install can carry and what every

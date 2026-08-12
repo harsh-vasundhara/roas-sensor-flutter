@@ -1,5 +1,6 @@
 import 'dart:io' show Platform;
 
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:flutter/services.dart';
 
 /// Flutter bridge for the ROASSensor Android (`com.roassensor.sdk.Roas`) and
@@ -24,6 +25,22 @@ class Roas {
       EventChannel('roas_flutter/delivery');
   static Stream<RoasDeliveryResult>? _deliveryStream;
 
+  /// Test-only escape hatch for the platform check every method below starts
+  /// with. `dart:io`'s [Platform] reports the REAL host OS with no override
+  /// hook — on the machine `flutter test` actually runs on (typically macOS,
+  /// Linux, or Windows CI), `Platform.isAndroid`/`isIOS` are both false, so
+  /// every method would silently take its no-op branch and never touch the
+  /// channel at all, making the channel argument contract untestable. Null
+  /// (the default) means "ask dart:io for real" — production code must never
+  /// set this to anything else.
+  @visibleForTesting
+  static RoasDebugPlatform? debugPlatformOverride;
+
+  static bool get _isAndroid =>
+      debugPlatformOverride?.isAndroid ?? Platform.isAndroid;
+  static bool get _isIOS => debugPlatformOverride?.isIOS ?? Platform.isIOS;
+  static bool get _supportsNativeChannel => _isAndroid || _isIOS;
+
   /// Every beacon delivery attempt, success or failure.
   ///
   /// An EventChannel rather than a callback argument because deliveries happen
@@ -40,7 +57,7 @@ class Roas {
   /// Broadcast and lazily created, so several listeners share one native
   /// subscription. Empty on platforms with no native implementation.
   static Stream<RoasDeliveryResult> get onDeliveryResult {
-    if (!Platform.isAndroid && !Platform.isIOS) {
+    if (!_supportsNativeChannel) {
       return const Stream<RoasDeliveryResult>.empty();
     }
     return _deliveryStream ??= _deliveryChannel
@@ -87,7 +104,7 @@ class Roas {
     String? appSecret,
     bool requestTrackingAuthorization = true,
   }) {
-    if (!Platform.isAndroid && !Platform.isIOS) return Future<void>.value();
+    if (!_supportsNativeChannel) return Future<void>.value();
     return _channel.invokeMethod<void>('initialize', {
       'publicKey': publicKey,
       'customerUserId': customerUserId,
@@ -107,7 +124,7 @@ class Roas {
   /// install beacon would have. Safe to call more than once — once the user has
   /// answered, iOS returns the stored answer without re-prompting.
   static Future<void> requestTracking() {
-    if (!Platform.isIOS) return Future<void>.value();
+    if (!_isIOS) return Future<void>.value();
     return _channel.invokeMethod<void>('requestTracking');
   }
 
@@ -131,7 +148,7 @@ class Roas {
     String? coarse,
     bool lockWindow = false,
   }) {
-    if (!Platform.isIOS) return Future<void>.value();
+    if (!_isIOS) return Future<void>.value();
     return _channel.invokeMethod<void>('updateConversionValue', {
       'value': value,
       'coarse': coarse,
@@ -144,7 +161,7 @@ class Roas {
   /// RevenueCat as the `appUserID` so a purchase attributes back to this
   /// install and its ad click.
   static Future<String?> visitorId() {
-    if (!Platform.isAndroid && !Platform.isIOS) return Future<String?>.value();
+    if (!_supportsNativeChannel) return Future<String?>.value();
     return _channel.invokeMethod<String?>('visitorId');
   }
 
@@ -175,7 +192,7 @@ class Roas {
   /// Billing as `obfuscatedAccountId` and the Play webhook resolves it the same
   /// way.
   static Future<String?> appAccountToken() {
-    if (!Platform.isAndroid && !Platform.isIOS) return Future<String?>.value();
+    if (!_supportsNativeChannel) return Future<String?>.value();
     return _channel.invokeMethod<String?>('appAccountToken');
   }
 
@@ -188,7 +205,7 @@ class Roas {
     String? phone,
     String? customerUserId,
   }) {
-    if (!Platform.isAndroid && !Platform.isIOS) return Future<void>.value();
+    if (!_supportsNativeChannel) return Future<void>.value();
     return _channel.invokeMethod<void>('identify', {
       'email': email,
       'phone': phone,
@@ -207,7 +224,7 @@ class Roas {
   /// call `Roas.track(RoasEvent.CUSTOM, name = "...")` (Kotlin) /
   /// `Roas.track(.custom, name: "...")` (Swift).
   static Future<void> track(String event, {Map<String, Object?>? properties}) {
-    if (!Platform.isAndroid && !Platform.isIOS) return Future<void>.value();
+    if (!_supportsNativeChannel) return Future<void>.value();
     return _channel.invokeMethod<void>('track', {
       'event': event,
       'properties': properties,
@@ -220,7 +237,7 @@ class Roas {
   /// carries no `rsclid` query parameter. This is *not* the install-referrer
   /// path (that's automatic on first launch) — it's for a later open.
   static Future<void> handleDeepLink(String url) {
-    if (!Platform.isAndroid && !Platform.isIOS) return Future<void>.value();
+    if (!_supportsNativeChannel) return Future<void>.value();
     return _channel.invokeMethod<void>('handleDeepLink', {'url': url});
   }
 
@@ -232,7 +249,7 @@ class Roas {
   /// device's own native logs while a full Dart-side delivery callback
   /// (an EventChannel) remains a follow-up, not yet built.
   static Future<void> setLogLevel(RoasLogLevel level) {
-    if (!Platform.isAndroid && !Platform.isIOS) return Future<void>.value();
+    if (!_supportsNativeChannel) return Future<void>.value();
     // Uppercased to match RoasLogLevel's Kotlin/Swift enum case names exactly.
     return _channel.invokeMethod<void>('setLogLevel', {'level': level.name.toUpperCase()});
   }
@@ -240,6 +257,18 @@ class Roas {
 
 /// Mirrors `RoasLogLevel` in `Roas.kt` / `RoasLogLevel.swift`.
 enum RoasLogLevel { none, error, debug }
+
+/// Test-only values for [Roas.debugPlatformOverride] — see its doc comment.
+/// Not `bool` because several methods below need to tell Android and iOS
+/// apart (e.g. [Roas.requestTracking] is iOS-only), which a single flag can't
+/// express.
+enum RoasDebugPlatform {
+  android,
+  ios;
+
+  bool get isAndroid => this == RoasDebugPlatform.android;
+  bool get isIOS => this == RoasDebugPlatform.ios;
+}
 
 /// One beacon delivery attempt, from [Roas.onDeliveryResult].
 class RoasDeliveryResult {

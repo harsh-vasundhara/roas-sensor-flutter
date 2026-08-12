@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:app_links/app_links.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show PlatformException;
 import 'package:purchases_flutter/purchases_flutter.dart';
@@ -87,6 +90,53 @@ class _RoasSamplePageState extends State<RoasSamplePage> {
   ];
   List<Package> _packages = [];
 
+  // Deep-link wiring — the ONLY thing in this sample that exercises
+  // Roas.handleDeepLink(). Without it, the deep-link → rsclid → backend
+  // TouchPoint path (the Android-twin of a Play install referrer, but for a
+  // later open of an app that's already installed) had no way to be verified
+  // on a real device or emulator: the URL never reached the SDK at all.
+  final AppLinks _appLinks = AppLinks();
+  StreamSubscription<Uri>? _linkSub;
+
+  @override
+  void initState() {
+    super.initState();
+    _wireDeepLinks();
+  }
+
+  @override
+  void dispose() {
+    _linkSub?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _wireDeepLinks() async {
+    // Cold start: the OS launched this app FROM a link tap, before this
+    // widget (or even Roas.initialize in main()) had a chance to see it.
+    try {
+      final initial = await _appLinks.getInitialLink();
+      if (initial != null) await _handleIncomingLink(initial);
+    } catch (e) {
+      await _append('→ initial deep link error: $e');
+    }
+    // Warm start: the app is already running and a link arrives — the
+    // Android App Link / iOS universal link equivalent of a browser
+    // navigation, which is what handleDeepLink documents itself as being for.
+    _linkSub = _appLinks.uriLinkStream.listen(
+      _handleIncomingLink,
+      onError: (Object e) => _append('→ deep link stream error: $e'),
+    );
+  }
+
+  Future<void> _handleIncomingLink(Uri uri) async {
+    await Roas.handleDeepLink(uri.toString());
+    final hasRsclid = uri.queryParameters.containsKey('rsclid');
+    await _append(
+      '→ handleDeepLink($uri) sent'
+      '${hasRsclid ? '' : ' — no rsclid in it, so this is a no-op on the native side'}',
+    );
+  }
+
   Future<void> _append(String line) async {
     setState(() => _log.add(line));
   }
@@ -164,9 +214,22 @@ class _RoasSamplePageState extends State<RoasSamplePage> {
                   child: const Text('Show visitor id'),
                 ),
                 ElevatedButton(
+                  // The fastest way to exercise the deep-link path with no
+                  // adb/Xcode juggling: this fires the exact same code path a
+                  // real tap on `roassample://open?rsclid=...` would, since
+                  // both end up at _handleIncomingLink -> Roas.handleDeepLink.
+                  // To trigger it via a REAL link instead:
+                  //   adb shell am start -a android.intent.action.VIEW \
+                  //     -d "roassample://open?rsclid=test123"
+                  onPressed: () => _handleIncomingLink(
+                    Uri.parse('roassample://open?rsclid=manual-test-123'),
+                  ),
+                  child: const Text('Simulate deep link'),
+                ),
+                ElevatedButton(
                   onPressed: _fetchOfferings,
                   child: const Text('RevenueCat: fetch offerings'),
-                ),
+                ),                                                                                  
                 for (final pkg in _packages)
                   ElevatedButton(
                     onPressed: () => _buyPackage(pkg),

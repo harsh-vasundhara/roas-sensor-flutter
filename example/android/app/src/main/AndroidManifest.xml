@@ -25,6 +25,21 @@
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
+            <!-- Custom-scheme deep link, so the sample can exercise
+                 Roas.handleDeepLink() with a one-line adb command and no
+                 hosted assetlinks.json:
+                   adb shell am start -a android.intent.action.VIEW \
+                     -d "roassample://open?rsclid=test123"
+                 A real deployment should ALSO add an https:// App Links
+                 intent-filter (android:autoVerify="true") once the app has a
+                 domain with a hosted assetlinks.json — the custom scheme
+                 alone is a dev/QA convenience, not a substitute for it. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="roassample" android:host="open"/>
+            </intent-filter>
         </activity>
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->

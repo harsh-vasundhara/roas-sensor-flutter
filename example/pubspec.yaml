@@ -43,6 +43,13 @@ dependencies:
   # RevenueCat's appUserID so the purchase webhook traces back to this install.
   purchases_flutter: ^8.0.0
 
+  # Deep links (Android App Links / custom scheme, iOS universal links / custom
+  # scheme) so this sample can actually exercise Roas.handleDeepLink() end to
+  # end. Without this, nothing in the example ever calls it — the deep-link →
+  # rsclid → backend TouchPoint path had no way to be verified on a real
+  # device or emulator.
+  app_links: ^6.3.3
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

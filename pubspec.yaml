@@ -5,7 +5,7 @@ description: Flutter bridge for the ROASSensor Android and iOS tracking SDKs (in
 # when that dependency moves, and not for plugin-only changes — adding
 # play-services-ads-identifier alone did not move it, the jump to roas 0.1.4 did.
 # Keep android/build.gradle and ios/roas_flutter.podspec in step.
-version: 0.1.4
+version: 0.1.5
 homepage: https://github.com/harsh-vasundhara/roas-android-sdk
 
 # Raised from Dart 3.0 / Flutter 3.10 by the Built-in Kotlin migration: the
