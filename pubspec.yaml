@@ -6,7 +6,12 @@ description: Flutter bridge for the ROASSensor Android and iOS tracking SDKs (in
 # play-services-ads-identifier alone did not move it, the jump to roas 0.1.4 did.
 # Keep android/build.gradle and ios/roas_flutter.podspec in step.
 version: 0.1.6
-homepage: https://github.com/harsh-vasundhara/roas-android-sdk
+# This package's own repo. It pointed at roas-android-sdk — the NATIVE Android
+# SDK this wraps — which sends anyone following it to a repo with no Dart in it,
+# and no `ref:` that resolves as a Flutter dependency. That is the exact wrong
+# turn to leave in a package whose install step is a git dependency on itself.
+homepage: https://github.com/harsh-vasundhara/roas-sensor-flutter
+repository: https://github.com/harsh-vasundhara/roas-sensor-flutter
 
 # Raised from Dart 3.0 / Flutter 3.10 by the Built-in Kotlin migration: the
 # `kotlin { compilerOptions { … } }` DSL in android/build.gradle needs KGP 2.x,
