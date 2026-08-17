@@ -312,3 +312,62 @@ abstract final class RoasEvent {
   static const tutorialComplete = 'tutorial_complete';
   static const share = 'share';
 }
+
+/// The property keys ROASSensor understands in [Roas.track] — mirroring
+/// native `RoasProps.kt`, and kept identical to it on purpose: an app that
+/// spells the key differently on Android than on iOS reports one product as
+/// two, and the mistake only surfaces months of data later.
+///
+/// The map stays free-form — record whatever you find useful alongside these.
+/// But reporting can only group by a key it can predict, so a product funnel
+/// can be built **only** from [productId].
+///
+/// ## The one that actually matters
+///
+/// [productId] must be **the same identifier the purchase will arrive with**
+/// — for RevenueCat the store product id, for Stripe the price/product id.
+/// That is what lines an `add_to_cart` up against the purchase that did or
+/// did not follow it. [productName] is for display only and must never be the
+/// join key: names get edited, translated, and reused.
+///
+/// ```dart
+/// Roas.track(RoasEvent.addToCart, properties: {
+///   RoasProps.productId: 'piano_course_annual',
+///   RoasProps.productName: 'Annual Piano Course',
+///   RoasProps.quantity: 1,
+///   RoasProps.price: 4999,   // minor units — see below
+///   RoasProps.currency: 'INR',
+/// });
+/// ```
+///
+/// ## Money in an event is never revenue
+///
+/// [price] is reporting colour only. Anything a device claims about money is
+/// unverifiable, so no ROAS numerator reads it — revenue enters solely through
+/// the signed webhook. Send it for funnel context, never expecting it in ROAS.
+abstract final class RoasProps {
+  /// Store product id. **Must match what the purchase will report**, or the
+  /// funnel cannot line the two up.
+  static const productId = 'product_id';
+
+  /// Display name. Never a join key — names change, ids do not.
+  static const productName = 'product_name';
+
+  /// Grouping for reports, e.g. `'courses'`.
+  static const category = 'category';
+
+  static const quantity = 'quantity';
+
+  /// Minor units (paise/cents), so an integer stays exact. Reporting only.
+  static const price = 'price';
+
+  /// ISO-4217, e.g. `'INR'`.
+  static const currency = 'currency';
+
+  /// Free-text, for [RoasEvent.search].
+  static const query = 'query';
+
+  /// Where in the app this happened (`'home'`, `'product_detail'`) — the same
+  /// event from a carousel and from a detail page are different behaviours.
+  static const source = 'source';
+}

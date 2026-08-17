@@ -1,5 +1,5 @@
 group 'com.roassensor.roas_flutter'
-version '0.1.4'
+version '0.1.6'
 
 buildscript {
     repositories {
@@ -126,7 +126,26 @@ dependencies {
     //     Xiaomi, Huawei, Samsung, Amazon) via the legacy INSTALL_REFERRER
     //     broadcast — the Play Install Referrer API alone answers
     //     FEATURE_NOT_SUPPORTED for those and nothing else.
-    implementation 'com.roassensor:roas:0.1.5'
+    // 0.1.6 is the OEM install-referrer pass, plus fixes for bugs that only
+    // real hardware exposed (Vivo V2130/V2142, Samsung, realme, OnePlus,
+    // HUAWEI, Xiaomi, a stock Pixel):
+    //   * OEM-native referrer channels: Vivo and Huawei read their store's own
+    //     ContentProvider directly; Xiaomi and Samsung go through optional
+    //     add-on modules. These run ONLY when Google's own Install Referrer
+    //     answered nothing usable AND the device is that OEM, so no other
+    //     device pays any latency.
+    //   * the fix that made the above reachable at all: OK_NOT_SET/OK_EMPTY
+    //     were treated as a usable referrer in three separate places, so the
+    //     fallback could never fire; and the OEM providers were invisible to
+    //     any app targeting API 30+ until the <queries> entries were added.
+    //   * every beacon now carries `ts` (client clock, server-corrected). An
+    //     install that happened offline used to be stamped at DELIVERY time —
+    //     48h of error measured on a real device — which silently moved
+    //     installs into the wrong day and broke click→install matching.
+    //   * identify() was not sending device_id, and session_number was missing
+    //     from three beacons.
+    //   * uptime_seconds was clamped at 65535 (a real device reported 576844).
+    implementation 'com.roassensor:roas:0.1.6'
 
     // GAID (advertising id) — the ONLY source of `device_id` on Android, which
     // is the strongest identity key an install can carry and what every

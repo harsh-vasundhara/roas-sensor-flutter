@@ -3,7 +3,7 @@ Pod::Spec.new do |s|
   # Tracks pubspec.yaml. It had drifted (0.1.2 against a 0.1.3 pubspec), which
   # makes `pod install` resolve a version that names a different plugin release
   # than the Dart side claims to be.
-  s.version          = '0.1.4'
+  s.version          = '0.1.6'
   s.summary          = 'Flutter bridge for the ROASSensor iOS tracking SDK.'
   s.description      = <<-DESC
     Thin Flutter bridge to the native RoasSensor iOS SDK (install attribution,
