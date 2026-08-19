@@ -54,18 +54,29 @@ buttons the same way as the native sample. `minSdk` was bumped to 23 in
 `example/android/app/build.gradle.kts` (RevenueCat's Android SDK floor, same
 bump the native sample needed).
 
-## ⚠️ iOS: bridge written, not yet built or run
+## ⚠️ iOS: the native SDK is proven, this bridge is not
 
-The `ios/` bridge (`RoasFlutterPlugin.swift` + `roas_flutter.podspec`) is
-written and mirrors the Android plugin method-for-method, but — unlike
-Android — **it has not been compiled, installed, or run on a device or
-simulator.** It was written on Windows, where there's no Xcode; someone with
-a Mac needs to open the example app in Xcode (once an `example/ios/`
-platform folder exists — see "Running the example app" below) and prove it
-the same way Android already was, before treating iOS as trustworthy the way
-Android now is. Nothing here should be assumed correct just because it
-compiles conceptually against `Roas.swift`'s real signatures — that hasn't
-been checked by an actual Swift compiler yet.
+Two different claims, and it matters which is which.
+
+**The native SDK underneath is verified.** `RoasSensor` 0.1.6 builds clean,
+passes 54 tests, and was confirmed field-by-field on a physical iPhone 12 mini
+(iOS 16.7): install beacon delivered, IDFA bound under an ATT grant, a real
+Apple Search Ads token resolved to `utm_source=apple_search_ads`, engagement
+folded onto the install touchpoint, and no false integrity signals. Every one
+of the ~25 device parameters landed.
+
+**This Dart→Swift bridge has still never been compiled.** It mirrors the
+Android plugin method-for-method and every call in it was checked against
+`Roas.swift`'s real public signatures, but no Swift compiler has seen it. What
+changed is that it is now *runnable*: `example/ios/` exists (with a Podfile and
+the ATT key already wired), so proving it is one `flutter run` on a Mac rather
+than an afternoon of scaffolding.
+
+The riskiest part is the delivery `EventChannel`, not the method channel: it
+crosses threads (`Transport` delivers off-main, a `FlutterEventSink` must be
+invoked on main) and clears a process-wide native callback on cancel. Hot
+restart the example a few times with the stream listening — that is the case
+the cleanup exists for.
 
 ## Install
 
@@ -116,14 +127,24 @@ Minimum Deployments). That is a separate setting from the Podfile's, so fixing
 only the Podfile clears the `pod install` failure and then fails again during
 the build with the same complaint from the app target.
 
-`RoasSensor` (the underlying native SDK, from `sdk-ios`) isn't published to a
-resolvable CocoaPods source yet — same pre-publish phase `sdk-android`'s
-Maven coordinate was in before Maven Central landed. Until it is, add an
-explicit source for it to your app's own `ios/Podfile` (`pod install` fails
-with "Unable to find a specification for RoasSensor" otherwise):
+`RoasSensor` (the underlying native SDK) now has a real repository and tag, but
+it is **not on the CocoaPods trunk** — and a podspec cannot name a git source
+for its own dependency. So your app's `ios/Podfile` has to say where it comes
+from (`pod install` fails with "Unable to find a specification for RoasSensor"
+otherwise, which reads like a broken plugin and is really a missing source):
 
 ```ruby
-# Podfile, local dev against a checked-out sdk-ios:
+pod 'RoasSensor', :git => 'https://github.com/rishabhrk2345/Roas-ios-SDK.git', :tag => '0.1.6'
+```
+
+`example/ios/Podfile` already carries that line — copy it from there. Pin a
+**tag**, never a branch: the plugin and the native SDK share one version number
+so a build can be traced to a release, and a branch would move the SDK under a
+build that still reports a fixed `sdk_version`.
+
+Developing against a local checkout instead:
+
+```ruby
 pod 'RoasSensor', :path => '../../sdk-ios'   # adjust to wherever you placed it
 ```
 
@@ -229,22 +250,28 @@ the wrong touch or to none.
 
 ## Running the example app
 
-`example/` is already a fully scaffolded, working Flutter app (generated via
-`flutter create --platforms=android example`, with the path dependency and
-`android:usesCleartextTraffic="true"` already wired in), **but Android-only —
-it has no `ios/` platform folder.** To test the iOS bridge, run (on a Mac)
-`flutter create --platforms=ios .` from inside `example/` to add one, then
-follow the "iOS-specific setup" section above for the Podfile/Info.plist
-changes before building. Nobody has done this yet; that's exactly what makes
-the iOS bridge unverified (see above).
-
-To run the existing Android example:
+`example/` is a fully scaffolded Flutter app for **both** platforms now, with
+the path dependency, `android:usesCleartextTraffic="true"`, and the iOS
+Podfile / ATT key already wired in.
 
 ```bash
 cd example
 flutter pub get
-flutter run   # with an emulator or device selected, same as the native sample app
+flutter run   # with an emulator, simulator or device selected
 ```
+
+On iOS the first run also needs `pod install`, which `flutter run` does for
+you. Three things are pre-solved in the checked-in `example/ios/` so you do not
+hit them:
+
+| Already handled | What it would have cost |
+|---|---|
+| `platform :ios, '14.0'` in the Podfile | `pod install` fails on a platform mismatch, and raising it in Xcode does not help — it is a separate setting |
+| `IPHONEOS_DEPLOYMENT_TARGET = 14.0` in the project | the same complaint again, at build time instead |
+| `NSUserTrackingUsageDescription` in Info.plist | iOS **terminates the app** when the ATT prompt fires without it |
+
+The `pod 'RoasSensor', :git => …, :tag => '0.1.6'` line is in the Podfile too —
+that one is not optional for any consuming app, so copy it into yours.
 
 Same `publicKey`/`baseUrl` values as `sample/MainActivity.kt` in the native
 repo — edit `example/lib/main.dart`'s `kPublicKey`/`kBaseUrl` constants if you

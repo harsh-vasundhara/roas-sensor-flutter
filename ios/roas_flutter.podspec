@@ -19,19 +19,24 @@ Pod::Spec.new do |s|
   s.source_files     = 'Classes/**/*'
   s.dependency 'Flutter'
 
-  # RoasSensor (sdk-ios) isn't published to a resolvable CocoaPods source yet
-  # (see sdk-ios/RoasSensor.podspec's own note — same pre-publish phase the
-  # Android bridge's roas-android dependency was in before Maven Central).
-  # Declaring the dependency here is still correct — it's what the plugin
-  # actually needs to compile — but until RoasSensor has a real git tag or
-  # trunk listing, whoever consumes this plugin must add an explicit source
-  # for it in their OWN app's ios/Podfile, e.g.:
-  #   pod 'RoasSensor', :path => '../../../sdk-ios'      # local dev
-  #   pod 'RoasSensor', :git => 'https://github.com/harsh-vasundhara/roas-sensor-ios.git', :tag => '0.1.0'
-  # Without one of those, `pod install` fails with "Unable to find a
-  # specification for RoasSensor" — that's expected until publishing lands,
-  # not a bug in this podspec.
-  s.dependency 'RoasSensor'
+  # RoasSensor now has a real home and a real tag:
+  #   https://github.com/rishabhrk2345/Roas-ios-SDK  (tag 0.1.6)
+  # It is NOT on the CocoaPods trunk, though, and a podspec cannot name a git
+  # source for its own dependency. So the consuming APP still has to say where
+  # it comes from, in its own ios/Podfile:
+  #
+  #   pod 'RoasSensor', :git => 'https://github.com/rishabhrk2345/Roas-ios-SDK.git', :tag => '0.1.6'
+  #
+  # Without that line `pod install` fails with "Unable to find a specification
+  # for RoasSensor", which reads like a broken plugin and is really a missing
+  # source. `example/ios/Podfile` carries the line, ready to copy.
+  #
+  # Version-pinned rather than bare. The plugin and the native SDK share one
+  # version number precisely so a build can be traced to a release, and an
+  # unconstrained dependency would let a future incompatible RoasSensor resolve
+  # silently against this bridge — the failure landing at runtime as missing
+  # methods rather than at resolve time as a version conflict.
+  s.dependency 'RoasSensor', '~> 0.1.6'
 
   s.platform = :ios, '14.0'
   s.pod_target_xcconfig = { 'DEFINES_MODULE' => 'YES' }
