@@ -1,11 +1,25 @@
 name: roas_flutter
 description: Flutter bridge for the ROASSensor Android and iOS tracking SDKs (install attribution, funnel events, identity).
-# Tracks the native SDK this wraps (com.roassensor:roas), so the plugin version
-# answers "which roas-android-sdk am I on" without opening build.gradle. Bump it
-# when that dependency moves, and not for plugin-only changes — adding
-# play-services-ads-identifier alone did not move it, the jump to roas 0.1.4 did.
+# The plugin's own version. It used to track `com.roassensor:roas` so the number
+# answered "which roas-android-sdk am I on" without opening build.gradle, and
+# plugin-only changes deliberately did not bump it.
+#
+# That rule no longer works, for two reasons. This wraps TWO native SDKs now
+# (com.roassensor:roas and RoasSensor), which one number cannot name. And it
+# left plugin-only work unreleasable: 0.1.7 is exactly that -- iOS became
+# runnable and the RoasSensor dependency got pinned, while both natives stayed
+# on 0.1.6 -- and the only way to ship it under the old rule would have been to
+# move the v0.1.6 tag, which makes one ref mean two different things depending
+# on when it was fetched. This project has already lost a round of testing to
+# that kind of ambiguity; see the pubspec.lock note in the HOP handoff.
+#
+# So: this number is the PLUGIN's, bumped whenever something ships. The native
+# versions it wraps are named in android/build.gradle and ios/*.podspec, which
+# is where someone checking them is already looking.
+#
+# 0.1.7 wraps: com.roassensor:roas 0.1.6 (Android), RoasSensor ~> 0.1.6 (iOS).
 # Keep android/build.gradle and ios/roas_flutter.podspec in step.
-version: 0.1.6
+version: 0.1.7
 # This package's own repo. It pointed at roas-android-sdk — the NATIVE Android
 # SDK this wraps — which sends anyone following it to a repo with no Dart in it,
 # and no `ref:` that resolves as a Flutter dependency. That is the exact wrong
