@@ -127,6 +127,25 @@ class _RoasSamplePageState extends State<RoasSamplePage> {
     setState(() => _log.add(line));
   }
 
+  /// Raise the ATT prompt now, and bind the IDFA if the user allows.
+  ///
+  /// A no-op on Android. Two cases this covers that launch-time prompting
+  /// cannot:
+  ///
+  /// * The app deliberately deferred the prompt (`requestTrackingAuthorization:
+  ///   false`) to ask at a better moment than a cold start -- which is what a
+  ///   shipping app should do, because a system alert before the user has seen
+  ///   anything worth trusting is the classic way to depress opt-in.
+  /// * The user already answered once. iOS then returns the stored answer
+  ///   WITHOUT re-prompting, so if they later flip the switch in Settings ->
+  ///   Privacy & Security -> Tracking, nothing tells the app. Calling this (or
+  ///   any [Roas.identify]) re-reads the id and binds it through /identify,
+  ///   which is the only thing that ever picks that up.
+  Future<void> _askTracking() async {
+    await Roas.requestTracking();
+    await _append('→ ATT requested (allow, then Identify to bind the IDFA)');
+  }
+
   /// The value a native StoreKit purchase must carry, so an App Store Server
   /// Notification traces back to this install and the ad click behind it.
   ///
@@ -194,6 +213,10 @@ class _RoasSamplePageState extends State<RoasSamplePage> {
                     Uri.parse('roassample://open?rsclid=manual-test-123'),
                   ),
                   child: const Text('Simulate deep link'),
+                ),
+                ElevatedButton(
+                  onPressed: _askTracking,
+                  child: const Text('Ask ATT now (iOS)'),
                 ),
                 ElevatedButton(
                   onPressed: _showPurchaseToken,
