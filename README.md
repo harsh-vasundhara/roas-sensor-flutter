@@ -32,37 +32,57 @@ a physical device:
   for local testing; production uses HTTPS), and a stale-build caching issue
   that required `flutter clean` to resolve after an unrelated manifest edit.
 
-What's *not* yet verified on Android: a real Play Store install (the
-referrer was empty in every test so far, as expected for `adb`/`flutter run`
-installs — see `docs/play-console-testing-flutter.md` in the main repo for
-why that's expected, not a bug, and the runbook for closing that gap), and a
-a real in-app purchase — no store notification has reached this backend from a
-Flutter build yet, on either platform. The wiring for it is one field on the
-purchase; see "Binding a purchase to the install" below.
+**The Play install referrer is verified too**, which is the part `adb` and
+`flutter run` can never show: those installs carry no referrer at all, because
+no Play Store performed them. A production Flutter integration on this plugin
+has since produced **34 Play-Store installs carrying a real referrer** —
+`referrer_source=google`, meaning Play's own Install Referrer API answered
+rather than any fallback — with the click id, campaign and source resolving
+through, a click-to-install gap of one second, across vivo, Xiaomi and Samsung
+handsets. Deterministic click → install works through this bridge.
 
-## ⚠️ iOS: the native SDK is proven, this bridge is not
+Still unverified on Android:
 
-Two different claims, and it matters which is which.
+- **Signed beacons.** Every install so far reports `signed: false`, because no
+  build has passed `appSecret` yet. The `Signer` is shared with iOS and has a
+  parity test against the backend, and iOS has now run it on a device — but the
+  Android path has never signed in the wild. Worth one run before any customer
+  turns on `require_signed_beacons`, since that switch starts *rejecting*
+  unsigned beacons.
+- **A real in-app purchase.** No store notification has reached a backend from
+  a Flutter build on either platform. The wiring is one field on the purchase;
+  see "Binding a purchase to the install" below.
+- **The OEM-store referrer fallback** (Vivo/Huawei/Xiaomi/Samsung app stores,
+  and the legacy `INSTALL_REFERRER` broadcast). Only matters for installs those
+  stores performed — a Play install on such a handset goes through Google's API
+  like any other, as the results above show.
 
-**The native SDK underneath is verified.** `RoasSensor` 0.1.7 builds clean,
-passes 54 tests, and was confirmed field-by-field on a physical iPhone 12 mini
-(iOS 16.7): install beacon delivered, IDFA bound under an ATT grant, a real
-Apple Search Ads token resolved to `utm_source=apple_search_ads`, engagement
-folded onto the install touchpoint, and no false integrity signals. Every one
-of the ~25 device parameters landed.
+## ✅ Verified end to end (iOS)
 
-**This Dart→Swift bridge has still never been compiled.** It mirrors the
-Android plugin method-for-method and every call in it was checked against
-`Roas.swift`'s real public signatures, but no Swift compiler has seen it. What
-changed is that it is now *runnable*: `example/ios/` exists (with a Podfile and
-the ATT key already wired), so proving it is one `flutter run` on a Mac rather
-than an afternoon of scaffolding.
+Built, installed and run from `example/` on a physical iPhone 12 mini
+(iOS 16.7), against `RoasSensor` 0.1.7:
 
-The riskiest part is the delivery `EventChannel`, not the method channel: it
-crosses threads (`Transport` delivers off-main, a `FlutterEventSink` must be
-invoked on main) and clears a process-wide native callback on cancel. Hot
-restart the example a few times with the stream listening — that is the case
-the cleanup exists for.
+- Install, session-start, deep-link and event beacons all delivered through the
+  Dart→Swift bridge and landed in the backend.
+- **All 36 device fields** arrived and were individually checked — form factor,
+  screen vs viewport, device class, network, battery, install dates, integrity.
+- **IDFA bound under a real ATT grant**, on the install beacon itself.
+- **Apple Search Ads token** read and resolved server-side to
+  `utm_source=apple_search_ads`.
+- **HMAC-signed beacons** accepted (`signed: true`), via
+  `--dart-define=ROAS_APP_SECRET=…`.
+- Deep links forwarded with their click id extracted server-side.
+- The delivery `EventChannel` — the riskiest piece, since it crosses threads and
+  clears a process-wide native callback on cancel — survived repeated hot
+  restarts with the stream listening.
+
+Two real bugs came out of that run, both now fixed: the SDK's ATT prompt never
+appeared on a Flutter host (iOS shows it only while the app is `.active`, and
+the SDK's fixed 0.6s wait was tuned for a native app calling `configure` from
+`onAppear` — Flutter runs `initialize` from Dart `main()` before `runApp()`, so
+the request landed mid-boot and was silently discarded), and `last_update_at`
+never arrived from a real device because the `.app` bundle carries no creation
+date on device while the Simulator hands one over happily.
 
 ## Install
 
@@ -350,13 +370,17 @@ lookup, on-device hashing, and the persisted retry queue are all unchanged;
 this bridge adds no new logic that could degrade accuracy. Confirmed on both
 an emulator and a physical device (see "Verified end to end" above).
 
-**On iOS: should be, by the same reasoning, but unproven.** The bridge is a
-pass-through to the same real `Roas.swift`/`RoasEvent.swift` — no logic is
-duplicated — but "should behave like the native SDK because it's a thin
-pass-through" was also true of Android before anyone actually ran it, and
-that's exactly when the two real bugs (cleartext traffic, stale build cache)
-turned up. Treat iOS as unverified until someone with a Mac runs it and
-confirms beacons land in the backend, the same way Android was proven.
+**On iOS: yes, proven.** Same reasoning and now the same evidence — the bridge
+is a pass-through to the real `Roas.swift`, and a physical-device run confirmed
+all 36 fields, the IDFA under an ATT grant, a resolved Apple Search Ads token
+and signed beacons (see "Verified end to end (iOS)" above).
+
+Worth keeping the reason that section exists, though: "it should behave like the
+native SDK because it is a thin pass-through" was true of Android too, right up
+until someone ran it and found two real bugs. iOS was no different — running it
+turned up an ATT prompt that never fired on any Flutter host, and an install
+timestamp that the Simulator reported and a real device did not. A pass-through
+adds no *tracking* logic, but the host platform still gets a vote.
 
 Other things that differ from a pure-native app on either platform:
 
