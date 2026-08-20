@@ -44,7 +44,7 @@ purchase; see "Binding a purchase to the install" below.
 
 Two different claims, and it matters which is which.
 
-**The native SDK underneath is verified.** `RoasSensor` 0.1.6 builds clean,
+**The native SDK underneath is verified.** `RoasSensor` 0.1.7 builds clean,
 passes 54 tests, and was confirmed field-by-field on a physical iPhone 12 mini
 (iOS 16.7): install beacon delivered, IDFA bound under an ATT grant, a real
 Apple Search Ads token resolved to `utm_source=apple_search_ads`, engagement
@@ -120,7 +120,7 @@ from (`pod install` fails with "Unable to find a specification for RoasSensor"
 otherwise, which reads like a broken plugin and is really a missing source):
 
 ```ruby
-pod 'RoasSensor', :git => 'https://github.com/rishabhrk2345/Roas-ios-SDK.git', :tag => '0.1.6'
+pod 'RoasSensor', :git => 'https://github.com/rishabhrk2345/Roas-ios-SDK.git', :tag => '0.1.7'
 ```
 
 `example/ios/Podfile` already carries that line — copy it from there. Pin a
@@ -326,7 +326,7 @@ hit them:
 | `IPHONEOS_DEPLOYMENT_TARGET = 14.0` in the project | the same complaint again, at build time instead |
 | `NSUserTrackingUsageDescription` in Info.plist | iOS **terminates the app** when the ATT prompt fires without it |
 
-The `pod 'RoasSensor', :git => …, :tag => '0.1.6'` line is in the Podfile too —
+The `pod 'RoasSensor', :git => …, :tag => '0.1.7'` line is in the Podfile too —
 that one is not optional for any consuming app, so copy it into yours.
 
 Same `publicKey`/`baseUrl` values as `sample/MainActivity.kt` in the native

@@ -20,12 +20,12 @@ Pod::Spec.new do |s|
   s.dependency 'Flutter'
 
   # RoasSensor now has a real home and a real tag:
-  #   https://github.com/rishabhrk2345/Roas-ios-SDK  (tag 0.1.6)
+  #   https://github.com/rishabhrk2345/Roas-ios-SDK  (tag 0.1.7)
   # It is NOT on the CocoaPods trunk, though, and a podspec cannot name a git
   # source for its own dependency. So the consuming APP still has to say where
   # it comes from, in its own ios/Podfile:
   #
-  #   pod 'RoasSensor', :git => 'https://github.com/rishabhrk2345/Roas-ios-SDK.git', :tag => '0.1.6'
+  #   pod 'RoasSensor', :git => 'https://github.com/rishabhrk2345/Roas-ios-SDK.git', :tag => '0.1.7'
   #
   # Without that line `pod install` fails with "Unable to find a specification
   # for RoasSensor", which reads like a broken plugin and is really a missing
@@ -36,7 +36,7 @@ Pod::Spec.new do |s|
   # unconstrained dependency would let a future incompatible RoasSensor resolve
   # silently against this bridge — the failure landing at runtime as missing
   # methods rather than at resolve time as a version conflict.
-  s.dependency 'RoasSensor', '~> 0.1.6'
+  s.dependency 'RoasSensor', '~> 0.1.7'
 
   s.platform = :ios, '14.0'
   s.pod_target_xcconfig = { 'DEFINES_MODULE' => 'YES' }
