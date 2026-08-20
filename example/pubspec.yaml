@@ -38,10 +38,6 @@ dependencies:
   roas_flutter:
     path: ../
 
-  # RevenueCat's own Flutter SDK — separate from roas_flutter. This app owns
-  # the purchase, we only own attribution: Roas.visitorId() is threaded in as
-  # RevenueCat's appUserID so the purchase webhook traces back to this install.
-  purchases_flutter: ^8.0.0
 
   # Deep links (Android App Links / custom scheme, iOS universal links / custom
   # scheme) so this sample can actually exercise Roas.handleDeepLink() end to

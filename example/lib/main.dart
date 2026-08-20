@@ -2,8 +2,6 @@ import 'dart:async';
 
 import 'package:app_links/app_links.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart' show PlatformException;
-import 'package:purchases_flutter/purchases_flutter.dart';
 import 'package:roas_flutter/roas_flutter.dart';
 
 /// The Flutter twin of `sample/MainActivity.kt` in the native roas-android-sdk
@@ -15,11 +13,6 @@ const String kBaseUrl = 'https://footless-hamper-playlist.ngrok-free.dev'; // re
 // HOP's key put sample-app installs inside HOP's retention, fraud and ROAS
 // numbers, which is exactly the data the beta exists to read.
 const String kPublicKey = '4709392e-486c-4d1f-b79f-50c9a39f515b';
-
-// RevenueCat's public Google API key for this project (Project settings →
-// API keys). Not the same as kPublicKey above — that one is ours, this one
-// is RevenueCat's.
-const String kRevenueCatApiKey = 'test_FzaGVLRLGebnvdQzbrWpjQxAKiR';
 
 /// Beacon signing secret — Setup → your app → Beacon signing → "Generate".
 ///
@@ -46,21 +39,6 @@ void main() async {
     // outright as INVALID. Absent must mean absent.
     appSecret: kAppSecret.isEmpty ? null : kAppSecret,
   );
-
-  // appUserID = our vid, so the purchase RevenueCat's webhook reports later
-  // carries the exact visitor whose ad click drove the install.
-  final vid = await Roas.visitorId();
-  // Guarded because this runs BEFORE runApp(): RevenueCat is a third party
-  // whose key here is a placeholder, and an exception at this line would leave
-  // the app with no UI at all -- which reads as "the ROAS plugin is broken"
-  // when it is nothing of the sort. Attribution does not depend on RevenueCat
-  // succeeding; Roas.initialize above has already reported the install.
-  try {
-    await Purchases.setLogLevel(LogLevel.debug);
-    await Purchases.configure(PurchasesConfiguration(kRevenueCatApiKey)..appUserID = vid);
-  } catch (e) {
-    debugPrint('RevenueCat not configured (fine for tracking tests): $e');
-  }
 
   runApp(const RoasSampleApp());
 }
@@ -97,7 +75,6 @@ class _RoasSamplePageState extends State<RoasSamplePage> {
         : 'signing: ON (secret ${kAppSecret.length} chars)',
     '',
   ];
-  List<Package> _packages = [];
 
   // Deep-link wiring — the ONLY thing in this sample that exercises
   // Roas.handleDeepLink(). Without it, the deep-link → rsclid → backend
@@ -150,36 +127,19 @@ class _RoasSamplePageState extends State<RoasSamplePage> {
     setState(() => _log.add(line));
   }
 
-  // Pulls the current Offering's packages from RevenueCat and adds one "Buy"
-  // button per package below the fetch button, so a real purchase is one tap
-  // away once a product exists in Play Console + RevenueCat.
-  Future<void> _fetchOfferings() async {
-    try {
-      final offerings = await Purchases.getOfferings();
-      final current = offerings.current;
-      if (current == null) {
-        await _append('→ offerings: none configured yet (check RevenueCat dashboard)');
-        return;
-      }
-      await _append(
-        "→ offerings: '${current.identifier}' has ${current.availablePackages.length} package(s)",
-      );
-      setState(() => _packages = current.availablePackages);
-    } catch (e) {
-      await _append('→ offerings error: $e');
-    }
-  }
-
-  Future<void> _buyPackage(Package pkg) async {
-    try {
-      final vid = await Roas.visitorId();
-      await Purchases.purchasePackage(pkg);
-      await _append('→ purchase completed: ${pkg.storeProduct.identifier} (vid=$vid)');
-    } on Exception catch (e) {
-      final cancelled = e is PlatformException &&
-          PurchasesErrorHelper.getErrorCode(e) == PurchasesErrorCode.purchaseCancelledError;
-      await _append(cancelled ? '→ purchase cancelled' : '→ purchase error: $e');
-    }
+  /// The value a native StoreKit purchase must carry, so an App Store Server
+  /// Notification traces back to this install and the ad click behind it.
+  ///
+  /// Hand it to StoreKit as the purchase's `appAccountToken`. The backend
+  /// rebuilds the visitor id from it -- that is the whole link between the
+  /// money and the campaign. A purchase without it still records revenue, it
+  /// just records it as UNATTRIBUTED, and no ad ever gets credit.
+  ///
+  /// Android's equivalent is Play Billing's `obfuscatedAccountId`, which takes
+  /// the raw `visitorId()` rather than this UUID form.
+  Future<void> _showPurchaseToken() async {
+    final token = await Roas.appAccountToken();
+    await _append('→ appAccountToken (StoreKit) = ${token ?? "null — iOS only"}');
   }
 
   @override
@@ -236,14 +196,9 @@ class _RoasSamplePageState extends State<RoasSamplePage> {
                   child: const Text('Simulate deep link'),
                 ),
                 ElevatedButton(
-                  onPressed: _fetchOfferings,
-                  child: const Text('RevenueCat: fetch offerings'),
-                ),                                                                                  
-                for (final pkg in _packages)
-                  ElevatedButton(
-                    onPressed: () => _buyPackage(pkg),
-                    child: Text('Buy: ${pkg.identifier} (${pkg.storeProduct.priceString})'),
-                  ),
+                  onPressed: _showPurchaseToken,
+                  child: const Text('Show appAccountToken'),
+                ),
               ],
             ),
           ),

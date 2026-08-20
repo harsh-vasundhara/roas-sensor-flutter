@@ -157,9 +157,13 @@ class Roas {
   }
 
   /// The stable visitor id for this install (`null` before [initialize] has
-  /// run, or on a platform with no native implementation). Pass this to
-  /// RevenueCat as the `appUserID` so a purchase attributes back to this
-  /// install and its ad click.
+  /// run, or on a platform with no native implementation).
+  ///
+  /// This is the value a purchase must carry back so it attributes to the
+  /// install and its ad click. On Android pass it to Play Billing as
+  /// `obfuscatedAccountId`; on iOS use [appAccountToken] instead, which is the
+  /// same id in the UUID shape StoreKit requires. If you route payments through
+  /// RevenueCat rather than the stores directly, this is its `appUserID`.
   static Future<String?> visitorId() {
     if (!_supportsNativeChannel) return Future<String?>.value();
     return _channel.invokeMethod<String?>('visitorId');

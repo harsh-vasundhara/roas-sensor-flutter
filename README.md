@@ -36,23 +36,9 @@ What's *not* yet verified on Android: a real Play Store install (the
 referrer was empty in every test so far, as expected for `adb`/`flutter run`
 installs — see `docs/play-console-testing-flutter.md` in the main repo for
 why that's expected, not a bug, and the runbook for closing that gap), and a
-real RevenueCat purchase (see "RevenueCat wiring" below — the example app is
-wired and builds cleanly, but no RevenueCat account has posted a webhook to
-this backend yet).
-
-## RevenueCat wiring (example app)
-
-`example/` now also configures RevenueCat's own Flutter SDK
-(`purchases_flutter`), threading `Roas.visitorId()` in as `appUserID` so a
-purchase attributes back to the install that drove it — mirrors
-`sample/MainActivity.kt`'s wiring exactly. Confirmed to compile and build a
-debug APK cleanly (`flutter analyze` clean, `flutter build apk --debug`
-succeeds); **not yet run against a real RevenueCat account** — fill in
-`kRevenueCatApiKey` in `example/lib/main.dart` with your project's key once
-you've signed up, then use the "RevenueCat: fetch offerings" / "Buy: ..."
-buttons the same way as the native sample. `minSdk` was bumped to 23 in
-`example/android/app/build.gradle.kts` (RevenueCat's Android SDK floor, same
-bump the native sample needed).
+a real in-app purchase — no store notification has reached this backend from a
+Flutter build yet, on either platform. The wiring for it is one field on the
+purchase; see "Binding a purchase to the install" below.
 
 ## ⚠️ iOS: the native SDK is proven, this bridge is not
 
@@ -186,25 +172,95 @@ custom event under that exact name, matching how the native sample app calls
 await Roas.track('boss_defeated');
 ```
 
-### Binding a purchase to the install (do this, or iOS revenue is orphaned)
+### Binding a purchase to the install (do this, or revenue is orphaned)
 
-Attribution needs the purchase to carry an id we can resolve back to the
-install. Which id depends on how you take payment:
+Attribution needs the purchase to carry an id resolvable back to the install.
+The store gives you one field for it; put ours in it.
 
 ```dart
-// RevenueCat (either platform) — the visitor id IS the appUserID
-await Purchases.configure(PurchasesConfiguration(key)..appUserID = await Roas.visitorId());
+// iOS — StoreKit / in_app_purchase
+final token = await Roas.appAccountToken();   // a UUID; null on Android
 
-// StoreKit via in_app_purchase (iOS)
-final token = await Roas.appAccountToken();      // null on Android
-
-// Play Billing via in_app_purchase (Android) — the raw visitor id
-final accountId = await Roas.visitorId();        // → obfuscatedAccountId
+// Android — Play Billing / in_app_purchase
+final accountId = await Roas.visitorId();     // the raw visitor id
 ```
 
-Skip this and the sale arrives with nothing tying it to an ad click: the
-revenue lands unattributed while the spend still counts, so ROAS reads *low*
-and the campaign looks dead when it isn't.
+`appAccountToken` is a UUID **derived from the visitor id**, not a separate
+identifier — the backend reconstructs the vid from it. Two different shapes
+because the two stores accept different things: Apple's `appAccountToken` is
+typed as a UUID, Play's `obfuscatedAccountId` is a free string.
+
+Skip it and the sale arrives with nothing tying it to an ad click. The revenue
+still lands, the spend still counts, and ROAS reads *low* — the campaign looks
+dead when it is working.
+
+### iOS: the App Store purchase path, end to end
+
+No RevenueCat, no shared secret, and nothing for your server to poll.
+
+```
+  app                     Apple                      ROASSensor
+  ───                     ─────                      ──────────
+  purchase with
+  appAccountToken   ──▶   App Store Server
+                          Notification v2      ──▶   POST /api/tracking/
+                          (signedPayload JWS)         webhooks/appstore/<public_key>
+                                                          │
+                                                          ├─ verify Apple's ES256
+                                                          │  cert chain (x5c)
+                                                          ├─ appAccountToken → vid
+                                                          └─ attribute to the install
+                                                             and its ad click
+```
+
+**1. Set the token on the purchase.** With `in_app_purchase`, the iOS
+implementation exposes `applicationUserName`; with raw StoreKit 2 it is
+`Product.PurchaseOption.appAccountToken(_:)`. Either way the value is
+`await Roas.appAccountToken()`.
+
+**2. Tell ROASSensor your bundle id.** Setup → your app → the iOS property's
+`bundle_id` must equal the app's real bundle identifier. The webhook checks the
+`bundleId` inside Apple's signed payload against it — a valid JWS for someone
+else's app is still authentic, so the bundle id is what scopes it to you.
+
+**3. Point Apple at the webhook.** App Store Connect → your app → **App
+Information → App Store Server Notifications**, set **Version 2**, and use:
+
+```
+https://<your-host>/api/tracking/webhooks/appstore/<your-site-public-key>
+```
+
+Set the **Sandbox URL** to the same endpoint. Sandbox purchases arrive with
+`environment: "sandbox"` and are recorded as test revenue rather than counted
+as money, so pointing both at one URL is safe and saves a second config.
+
+**4. There is no secret to configure.** Authenticity is Apple's signature: the
+payload is a JWS signed with a certificate chain that must terminate at Apple
+Root CA G3. Nothing is shared, so nothing can leak.
+
+#### What gets counted
+
+| Apple `notificationType` | Recorded as |
+|---|---|
+| `SUBSCRIBED`, `DID_RENEW`, `ONE_TIME_CHARGE`, `OFFER_REDEEMED` | revenue |
+| `REFUND` | a negative conversion mirroring the original |
+| everything else (`EXPIRED`, `DID_CHANGE_RENEWAL_STATUS`, …) | ignored, answered `200` |
+
+Ignored types still get a `2xx` on purpose — Apple retries a non-2xx for days,
+and "I understood you and there is no money here" is not a failure.
+
+**Each renewal needs its own transaction**, which Apple already provides:
+subscription renewals arrive as separate notifications with their own
+transaction ids, so they are counted individually rather than deduping away
+against the first one.
+
+#### Verifying it
+
+The sample's **"Show appAccountToken"** button prints the value the purchase
+must carry. Make a sandbox purchase, then check the conversion landed against
+the same `vid` the install reported. If revenue arrives but shows as
+UNATTRIBUTED, the token was not set on the purchase — that is the only thing
+that link depends on.
 
 ### iOS: ATT timing
 
