@@ -50,8 +50,17 @@ void main() async {
   // appUserID = our vid, so the purchase RevenueCat's webhook reports later
   // carries the exact visitor whose ad click drove the install.
   final vid = await Roas.visitorId();
-  await Purchases.setLogLevel(LogLevel.debug);
-  await Purchases.configure(PurchasesConfiguration(kRevenueCatApiKey)..appUserID = vid);
+  // Guarded because this runs BEFORE runApp(): RevenueCat is a third party
+  // whose key here is a placeholder, and an exception at this line would leave
+  // the app with no UI at all -- which reads as "the ROAS plugin is broken"
+  // when it is nothing of the sort. Attribution does not depend on RevenueCat
+  // succeeding; Roas.initialize above has already reported the install.
+  try {
+    await Purchases.setLogLevel(LogLevel.debug);
+    await Purchases.configure(PurchasesConfiguration(kRevenueCatApiKey)..appUserID = vid);
+  } catch (e) {
+    debugPrint('RevenueCat not configured (fine for tracking tests): $e');
+  }
 
   runApp(const RoasSampleApp());
 }
