@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io' show Platform;
 
 import 'package:app_links/app_links.dart';
 import 'package:flutter/material.dart';
@@ -161,6 +162,26 @@ class _RoasSamplePageState extends State<RoasSamplePage> {
     await _append('→ appAccountToken (StoreKit) = ${token ?? "null — iOS only"}');
   }
 
+  /// Manual check of [Roas.verifyPurchase] with a FAKE receipt — there is no
+  /// StoreKit / Play Billing in this sample. It proves the request is built,
+  /// signed, routed and authorised: with no store credential on the test
+  /// app the collector answers 422 ("could not verify"), which is the pass
+  /// here; a 400 means the body is wrong, a 401 that signing broke. Platform-
+  /// aware because the two stores name a receipt differently and the native
+  /// side rejects the wrong one (MISSING_ARG) rather than exercising anything.
+  Future<void> _verifyFakePurchase() async {
+    final stamp = DateTime.now().millisecondsSinceEpoch;
+    if (Platform.isIOS) {
+      await Roas.verifyPurchase(transactionId: 'fake-txn-manual-test-$stamp');
+    } else {
+      await Roas.verifyPurchase(
+        purchaseToken: 'fake-token-manual-test-$stamp',
+        productId: 'demo_product',
+      );
+    }
+    await _append('→ verifyPurchase() sent (expect 422 on the delivery stream: fake receipt)');
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -221,6 +242,10 @@ class _RoasSamplePageState extends State<RoasSamplePage> {
                 ElevatedButton(
                   onPressed: _showPurchaseToken,
                   child: const Text('Show appAccountToken'),
+                ),
+                ElevatedButton(
+                  onPressed: _verifyFakePurchase,
+                  child: const Text('Verify purchase (fake receipt)'),
                 ),
               ],
             ),

@@ -235,6 +235,49 @@ class Roas {
     });
   }
 
+  /// Ask the collector to VERIFY a purchase against the store's own records
+  /// the moment the app sees it, instead of waiting for the store's own
+  /// asynchronous server-to-server notification (minutes, on Play; a
+  /// separate unordered delivery on the App Store). The dashboard is correct
+  /// while the buyer is still in the app.
+  ///
+  /// This never asserts revenue. The app only NAMES a receipt — a StoreKit
+  /// [transactionId] on iOS, a Play [purchaseToken] + [productId] on Android
+  /// — and the collector asks Apple's App Store Server API or the Play
+  /// Developer API what it was worth and books whatever THEY report. A
+  /// tampered build can at most ask about a purchase that really happened,
+  /// for the price it really was, which is why this can exist while
+  /// `track('purchase', {price: …})` can never be revenue. Booked under the
+  /// same `external_id` the store notification will carry, so the two dedupe:
+  /// whichever arrives first wins and the other is a no-op.
+  ///
+  /// Fire-and-forget like [track]: the outcome surfaces on the delivery
+  /// stream under `/api/tracking/mobile/purchase`. Call it once the store has
+  /// confirmed the purchase — on iOS from your `Transaction.updates` handling
+  /// (`String(transaction.id)`, not `originalID`), on Android once the
+  /// purchase is `PURCHASED`. One shared signature so a cross-platform call
+  /// site is one call: each native side reads only its own fields and ignores
+  /// the other's.
+  ///
+  /// Requires native RoasSensor 0.1.9+ / com.roassensor:roas 0.1.8+ (plugin
+  /// 0.1.9), and the store credential saved on the app in the panel; without
+  /// it the collector answers 422 and books nothing — the notification path
+  /// is unaffected.
+  static Future<void> verifyPurchase({
+    String? transactionId,
+    String? purchaseToken,
+    String? productId,
+    bool isSubscription = false,
+  }) {
+    if (!_supportsNativeChannel) return Future<void>.value();
+    return _channel.invokeMethod<void>('verifyPurchase', {
+      'transactionId': transactionId,
+      'purchaseToken': purchaseToken,
+      'productId': productId,
+      'isSubscription': isSubscription,
+    });
+  }
+
   /// Forward a direct deep link (a link that opened the app while it was
   /// already installed — an Android App Link or an iOS universal link) so
   /// its `rsclid` attributes this open deterministically. A no-op if [url]

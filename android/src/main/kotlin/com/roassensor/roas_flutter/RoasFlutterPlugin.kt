@@ -151,6 +151,20 @@ class RoasFlutterPlugin : FlutterPlugin, MethodCallHandler {
                 result.success(null)
             }
 
+            "verifyPurchase" -> {
+                // The Dart signature is shared with iOS; this side reads only the
+                // Play fields and ignores `transactionId`.
+                val purchaseToken = call.argument<String>("purchaseToken")
+                val productId = call.argument<String>("productId")
+                if (purchaseToken.isNullOrEmpty() || productId.isNullOrEmpty()) {
+                    result.error("MISSING_ARG", "purchaseToken and productId are required on Android", null)
+                    return
+                }
+                val isSubscription = call.argument<Boolean>("isSubscription") ?: false
+                Roas.verifyPurchase(purchaseToken, productId, isSubscription)
+                result.success(null)
+            }
+
             "handleDeepLink" -> {
                 val url = call.argument<String>("url")
                 if (url == null) {

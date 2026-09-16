@@ -115,6 +115,46 @@ void main() {
     });
   });
 
+  group('verifyPurchase', () {
+    test('an iOS transaction id is forwarded, with the Android fields null', () async {
+      await Roas.verifyPurchase(transactionId: '2000000912345678');
+      expect(calls.single.method, 'verifyPurchase');
+      expect(calls.single.arguments, {
+        'transactionId': '2000000912345678',
+        'purchaseToken': null,
+        'productId': null,
+        'isSubscription': false,
+      });
+    });
+
+    test('a Play token + product id are forwarded, subscription defaulting false', () async {
+      await Roas.verifyPurchase(purchaseToken: 'tok-1', productId: 'pro.monthly');
+      expect(calls.single.arguments, {
+        'transactionId': null,
+        'purchaseToken': 'tok-1',
+        'productId': 'pro.monthly',
+        'isSubscription': false,
+      });
+    });
+
+    test('isSubscription is passed through when set', () async {
+      // Play resolves a subscription through a different endpoint than a
+      // one-off; dropping the flag would ask the wrong one and resolve nothing.
+      await Roas.verifyPurchase(purchaseToken: 'tok-2', productId: 'monthly', isSubscription: true);
+      expect(calls.single.arguments['isSubscription'], true);
+    });
+
+    test('the shared shape is sent whole, never filtered per platform', () async {
+      // Each native side reads only its own keys. The Dart layer must not
+      // guess the platform and strip the rest — a cross-platform call site
+      // sending both would have the wrong half removed by a bridge mistake
+      // rather than ignored by the side that knows.
+      await Roas.verifyPurchase(transactionId: 'txn', purchaseToken: 'tok', productId: 'p');
+      expect(calls.single.arguments['transactionId'], 'txn');
+      expect(calls.single.arguments['purchaseToken'], 'tok');
+    });
+  });
+
   test('handleDeepLink forwards the raw url unmodified', () async {
     const url = 'https://example.com/open?rsclid=AbC123&utm_source=meta';
     await Roas.handleDeepLink(url);
@@ -181,6 +221,7 @@ void main() {
       await Roas.identify(email: 'buyer@example.com');
       await Roas.track(RoasEvent.addToCart);
       await Roas.handleDeepLink('https://example.com?rsclid=x');
+      await Roas.verifyPurchase(transactionId: '1');
       await Roas.setLogLevel(RoasLogLevel.debug);
       await Roas.requestTracking();
       await Roas.updateConversionValue(1);

@@ -1,5 +1,5 @@
 group 'com.roassensor.roas_flutter'
-version '0.1.7'
+version '0.1.9'
 
 buildscript {
     repositories {
@@ -145,7 +145,17 @@ dependencies {
     //   * identify() was not sending device_id, and session_number was missing
     //     from three beacons.
     //   * uptime_seconds was clamped at 65535 (a real device reported 576844).
-    implementation 'com.roassensor:roas:0.1.6'
+    // 0.1.8 (Maven Central, 2026-09-16) is 0.1.6 plus:
+    //   * 0.1.7: handleDeepLink stamps referrer_source="deeplink", as the iOS
+    //     SDK always did, so one user action lands in one bucket across the
+    //     two platforms.
+    //   * 0.1.8: Roas.verifyPurchase(purchaseToken, productId, isSubscription),
+    //     the Android half of POST /api/tracking/mobile/purchase, which this
+    //     plugin's verifyPurchase() calls. Not 0.1.7/0.1.9 on purpose: 0.1.7
+    //     was never published and a stale mavenLocal 0.1.9 existed on
+    //     developer machines, so the real release took a number no cache had
+    //     ever held.
+    implementation 'com.roassensor:roas:0.1.8'
 
     // GAID (advertising id) — the ONLY source of `device_id` on Android, which
     // is the strongest identity key an install can carry and what every

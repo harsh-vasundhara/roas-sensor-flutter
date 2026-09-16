@@ -3,7 +3,7 @@ Pod::Spec.new do |s|
   # Tracks pubspec.yaml. It had drifted (0.1.2 against a 0.1.3 pubspec), which
   # makes `pod install` resolve a version that names a different plugin release
   # than the Dart side claims to be.
-  s.version          = '0.1.8'
+  s.version          = '0.1.9'
   s.summary          = 'Flutter bridge for the ROASSensor iOS tracking SDK.'
   s.description      = <<-DESC
     Thin Flutter bridge to the native RoasSensor iOS SDK (install attribution,
@@ -20,12 +20,12 @@ Pod::Spec.new do |s|
   s.dependency 'Flutter'
 
   # RoasSensor now has a real home and a real tag:
-  #   https://github.com/rishabhrk2345/Roas-ios-SDK  (tag 0.1.7)
+  #   https://github.com/rishabhrk2345/Roas-ios-SDK  (tag 0.1.10)
   # It is NOT on the CocoaPods trunk, though, and a podspec cannot name a git
   # source for its own dependency. So the consuming APP still has to say where
   # it comes from, in its own ios/Podfile:
   #
-  #   pod 'RoasSensor', :git => 'https://github.com/rishabhrk2345/Roas-ios-SDK.git', :tag => '0.1.7'
+  #   pod 'RoasSensor', :git => 'https://github.com/rishabhrk2345/Roas-ios-SDK.git', :tag => '0.1.10'
   #
   # Without that line `pod install` fails with "Unable to find a specification
   # for RoasSensor", which reads like a broken plugin and is really a missing
@@ -36,7 +36,13 @@ Pod::Spec.new do |s|
   # unconstrained dependency would let a future incompatible RoasSensor resolve
   # silently against this bridge — the failure landing at runtime as missing
   # methods rather than at resolve time as a version conflict.
-  s.dependency 'RoasSensor', '~> 0.1.7'
+  #
+  # 0.1.9 is the floor as of plugin 0.1.9: `Roas.verifyPurchase(transactionId:)`
+  # is 0.1.9 API and RoasFlutterPlugin.swift calls it. Apps should name 0.1.10
+  # in their Podfile — it adds the PrivacyInfo.xcprivacy without which App
+  # Store Connect refuses the upload (ITMS-91053), and fixes TestFlight installs
+  # being labelled as developer builds.
+  s.dependency 'RoasSensor', '~> 0.1.9'
 
   s.platform = :ios, '14.0'
   s.pod_target_xcconfig = { 'DEFINES_MODULE' => 'YES' }

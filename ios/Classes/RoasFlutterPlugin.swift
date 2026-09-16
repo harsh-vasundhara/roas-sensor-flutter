@@ -113,6 +113,20 @@ public class RoasFlutterPlugin: NSObject, FlutterPlugin {
             }
             result(nil)
 
+        case "verifyPurchase":
+            // Shared Dart signature; this side reads only `transactionId` and
+            // ignores the Play fields.
+            guard
+                let args = call.arguments as? [String: Any],
+                let transactionId = args["transactionId"] as? String,
+                !transactionId.isEmpty
+            else {
+                result(FlutterError(code: "MISSING_ARG", message: "transactionId is required on iOS", details: nil))
+                return
+            }
+            Roas.verifyPurchase(transactionId: transactionId)
+            result(nil)
+
         case "handleDeepLink":
             guard
                 let args = call.arguments as? [String: Any],

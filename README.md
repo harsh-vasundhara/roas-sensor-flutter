@@ -140,7 +140,7 @@ from (`pod install` fails with "Unable to find a specification for RoasSensor"
 otherwise, which reads like a broken plugin and is really a missing source):
 
 ```ruby
-pod 'RoasSensor', :git => 'https://github.com/rishabhrk2345/Roas-ios-SDK.git', :tag => '0.1.7'
+pod 'RoasSensor', :git => 'https://github.com/rishabhrk2345/Roas-ios-SDK.git', :tag => '0.1.10'
 ```
 
 `example/ios/Podfile` already carries that line — copy it from there. Pin a
@@ -282,6 +282,36 @@ the same `vid` the install reported. If revenue arrives but shows as
 UNATTRIBUTED, the token was not set on the purchase — that is the only thing
 that link depends on.
 
+### Verifying a purchase the instant it happens (plugin 0.1.9+)
+
+The store's own notification remains the source of truth and stays so. What
+it cannot be is *prompt* — Play's can take minutes — and until it lands the
+buyer is standing in the app having just paid while the dashboard shows
+nothing. `verifyPurchase` closes that gap without moving the trust boundary:
+the app only **names** a receipt, the collector asks the store what it was
+worth, and the later notification for the same sale dedupes against it.
+
+```dart
+// iOS — from your StoreKit transaction handling; the transaction's own id,
+// not originalID (that names the subscription's first purchase).
+await Roas.verifyPurchase(transactionId: transaction.id.toString());
+
+// Android — once the purchase is PURCHASED.
+await Roas.verifyPurchase(
+  purchaseToken: purchase.purchaseToken,
+  productId: purchase.productId,
+  isSubscription: true,
+);
+```
+
+One signature for both platforms; each native side reads only its own fields.
+Fire-and-forget: the outcome arrives on the delivery stream under
+`/api/tracking/mobile/purchase`. Needs the store credential saved on the app in
+the panel (an Apple In-App Purchase key, or the Play service account); without
+it the collector answers 422 and books nothing — the notification path is
+unaffected. The sample's **"Verify purchase (fake receipt)"** button sends a
+fake receipt so a 422 is the expected, passing outcome.
+
 ### iOS: ATT timing
 
 The prompt fires ~0.6s after `initialize` by default — a cold-start system
@@ -346,7 +376,7 @@ hit them:
 | `IPHONEOS_DEPLOYMENT_TARGET = 14.0` in the project | the same complaint again, at build time instead |
 | `NSUserTrackingUsageDescription` in Info.plist | iOS **terminates the app** when the ATT prompt fires without it |
 
-The `pod 'RoasSensor', :git => …, :tag => '0.1.7'` line is in the Podfile too —
+The `pod 'RoasSensor', :git => …, :tag => '0.1.10'` line is in the Podfile too —
 that one is not optional for any consuming app, so copy it into yours.
 
 Same `publicKey`/`baseUrl` values as `sample/MainActivity.kt` in the native
