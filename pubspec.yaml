@@ -19,7 +19,7 @@ description: Flutter bridge for the ROASSensor Android and iOS tracking SDKs (in
 #
 # 0.1.7 wraps: com.roassensor:roas 0.1.6 (Android), RoasSensor ~> 0.1.6 (iOS).
 # Keep android/build.gradle and ios/roas_flutter.podspec in step.
-version: 0.1.9
+version: 0.1.10
 # This package's own repo. It pointed at roas-android-sdk — the NATIVE Android
 # SDK this wraps — which sends anyone following it to a repo with no Dart in it,
 # and no `ref:` that resolves as a Flutter dependency. That is the exact wrong

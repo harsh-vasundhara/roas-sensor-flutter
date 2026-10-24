@@ -140,7 +140,7 @@ from (`pod install` fails with "Unable to find a specification for RoasSensor"
 otherwise, which reads like a broken plugin and is really a missing source):
 
 ```ruby
-pod 'RoasSensor', :git => 'https://github.com/rishabhrk2345/Roas-ios-SDK.git', :tag => '0.1.10'
+pod 'RoasSensor', :git => 'https://github.com/rishabhrk2345/Roas-ios-SDK.git', :tag => '0.1.15'
 ```
 
 `example/ios/Podfile` already carries that line — copy it from there. Pin a
@@ -376,7 +376,7 @@ hit them:
 | `IPHONEOS_DEPLOYMENT_TARGET = 14.0` in the project | the same complaint again, at build time instead |
 | `NSUserTrackingUsageDescription` in Info.plist | iOS **terminates the app** when the ATT prompt fires without it |
 
-The `pod 'RoasSensor', :git => …, :tag => '0.1.10'` line is in the Podfile too —
+The `pod 'RoasSensor', :git => …, :tag => '0.1.15'` line is in the Podfile too —
 that one is not optional for any consuming app, so copy it into yours.
 
 Same `publicKey`/`baseUrl` values as `sample/MainActivity.kt` in the native

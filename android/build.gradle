@@ -1,5 +1,5 @@
 group 'com.roassensor.roas_flutter'
-version '0.1.9'
+version '0.1.10'
 
 buildscript {
     repositories {
@@ -155,7 +155,10 @@ dependencies {
     //     was never published and a stale mavenLocal 0.1.9 existed on
     //     developer machines, so the real release took a number no cache had
     //     ever held.
-    implementation 'com.roassensor:roas:0.1.8'
+    // 0.1.10 (Maven Central, 2026-10-24): the default collector is
+    //   https://core.roassensor.com (api.roassensor.com has no DNS), and
+    //   track() props are cleaned, so a NaN no longer drops the event.
+    implementation 'com.roassensor:roas:0.1.10'
 
     // GAID (advertising id) — the ONLY source of `device_id` on Android, which
     // is the strongest identity key an install can carry and what every

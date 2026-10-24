@@ -52,7 +52,7 @@ target 'Runner' do
   # Pinned to a TAG, not a branch: SPM and CocoaPods both resolve RoasSensor by
   # tag, and a branch would silently move the native SDK under a build that
   # reports a fixed `sdk_version`.
-  pod 'RoasSensor', :git => 'https://github.com/rishabhrk2345/Roas-ios-SDK.git', :tag => '0.1.10'
+  pod 'RoasSensor', :git => 'https://github.com/rishabhrk2345/Roas-ios-SDK.git', :tag => '0.1.15'
 
   # Developing against a local checkout of the SDK instead? Comment the line
   # above and use this, pointed at wherever you cloned it:
