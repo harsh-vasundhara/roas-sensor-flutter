@@ -77,6 +77,9 @@ class RoasFlutterPlugin : FlutterPlugin, MethodCallHandler {
                 val customerUserId = call.argument<String>("customerUserId")
                 val baseUrl = call.argument<String>("baseUrl")
                 val appSecret = call.argument<String>("appSecret")
+                // Meta's own install referrer (native 0.1.12+): the Facebook app id of the
+                // Meta app that runs this app's install ads. Null = Google Play's referrer only.
+                val metaAppId = call.argument<String>("metaAppId")
                 // NAMED arguments, not positional. These used to be positional,
                 // which meant a new parameter added anywhere but the end of
                 // Roas.initialize() silently rebound every one of them by a slot
@@ -91,6 +94,7 @@ class RoasFlutterPlugin : FlutterPlugin, MethodCallHandler {
                         customerUserId = customerUserId,
                         baseUrl = baseUrl,
                         appSecret = appSecret,
+                        metaAppId = metaAppId,
                     )
                 } else {
                     Roas.initialize(
@@ -98,6 +102,7 @@ class RoasFlutterPlugin : FlutterPlugin, MethodCallHandler {
                         publicKey = publicKey,
                         customerUserId = customerUserId,
                         appSecret = appSecret,
+                        metaAppId = metaAppId,
                     )
                 }
                 result.success(null)

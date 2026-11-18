@@ -89,6 +89,14 @@ class Roas {
   /// which the public key alone already allowed, and rotating it invalidates
   /// every build carrying the old one. Prefer `--dart-define` over a literal so
   /// it stays out of source control.
+  /// [metaAppId] (**Android only**, needs native 0.1.12+) is the Facebook app id
+  /// of the Meta app that runs this app's install ads, the same app whose
+  /// *Install Referrer Decryption Key* you saved in ROASSensor (Attribution).
+  /// With it the first launch also reads Meta's own install referrer from the
+  /// Facebook / Instagram app, which sees an install after an ad was only
+  /// *viewed*, or tapped in an earlier session, as well as the same-session taps
+  /// Google Play's referrer carries. Leave it out to read Google Play's alone.
+  /// Ignored on iOS, which has no such referrer.
   /// [requestTrackingAuthorization] (**iOS only**) controls whether the App
   /// Tracking Transparency prompt is shown on first launch. Leave it true and
   /// the prompt appears ~0.6s after this call — a cold-start system alert,
@@ -102,6 +110,7 @@ class Roas {
     String? customerUserId,
     String? baseUrl,
     String? appSecret,
+    String? metaAppId,
     bool requestTrackingAuthorization = true,
   }) {
     if (!_supportsNativeChannel) return Future<void>.value();
@@ -110,6 +119,7 @@ class Roas {
       'customerUserId': customerUserId,
       'baseUrl': baseUrl,
       'appSecret': appSecret,
+      'metaAppId': metaAppId,
       'requestTrackingAuthorization': requestTrackingAuthorization,
     });
   }

@@ -54,6 +54,7 @@ void main() {
         customerUserId: 'user-42',
         baseUrl: 'https://collector.example.com',
         appSecret: 'shh',
+        metaAppId: '1234567890',
         requestTrackingAuthorization: false,
       );
 
@@ -64,6 +65,7 @@ void main() {
         'customerUserId': 'user-42',
         'baseUrl': 'https://collector.example.com',
         'appSecret': 'shh',
+        'metaAppId': '1234567890',
         'requestTrackingAuthorization': false,
       });
     });
@@ -76,6 +78,7 @@ void main() {
         'customerUserId': null,
         'baseUrl': null,
         'appSecret': null,
+        'metaAppId': null,
         'requestTrackingAuthorization': true,
       });
     });

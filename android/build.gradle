@@ -158,7 +158,11 @@ dependencies {
     // 0.1.10 (Maven Central, 2026-10-24): the default collector is
     //   https://core.roassensor.com (api.roassensor.com has no DNS), and
     //   track() props are cleaned, so a NaN no longer drops the event.
-    implementation 'com.roassensor:roas:0.1.10'
+    // 0.1.12 (NOT YET on Maven Central when this line was written): Meta's own install
+    //   referrer. Roas.initialize(metaAppId = ...) reads it from the Facebook / Instagram
+    //   app on first launch; this plugin passes `metaAppId` through. 0.1.11 (Google
+    //   consent) is on Central but this plugin does not bridge setGoogleConsent yet.
+    implementation 'com.roassensor:roas:0.1.12'
 
     // GAID (advertising id) — the ONLY source of `device_id` on Android, which
     // is the strongest identity key an install can carry and what every
