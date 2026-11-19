@@ -124,6 +124,29 @@ class Roas {
     });
   }
 
+  /// **Android only** (native 0.1.11+; a no-op on iOS) — relay the person's **Google** consent
+  /// choices from your consent banner, using Google's Consent Mode names.
+  ///
+  /// [adUserData]: may this person's data be sent to Google for advertising? `false` and nothing
+  /// about them is ever sent to Google through ROAS Sensor. [adPersonalization]: may it be used for
+  /// personalised advertising? `false` and they are still measured, but not for personalisation.
+  ///
+  /// **Needed for people in the EU, the EEA and the UK** when you measure Google App campaigns:
+  /// Google requires both flags for them, so an app that never calls this is not reported to Google
+  /// for those people (everyone else is unaffected). Persisted, so they answer once. Safe before
+  /// [initialize], and best called there, so the install itself carries the choice. Separate from
+  /// the CCPA "do not sell or share" choice: neither implies the other.
+  static Future<void> setGoogleConsent({
+    required bool adUserData,
+    required bool adPersonalization,
+  }) {
+    if (!_isAndroid) return Future<void>.value();
+    return _channel.invokeMethod<void>('setGoogleConsent', {
+      'adUserData': adUserData,
+      'adPersonalization': adPersonalization,
+    });
+  }
+
   /// **iOS only** — show the ATT prompt now, and bind the IDFA if granted.
   /// A no-op on Android. Pair with
   /// `initialize(requestTrackingAuthorization: false)`.

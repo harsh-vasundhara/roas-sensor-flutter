@@ -207,6 +207,19 @@ On first launch the Android SDK then also reads Meta's own install referrer from
 Instagram app. It is ignored on iOS and when `metaAppId` is omitted. This needs the native
 Android SDK 0.1.12, which this plugin pins once that release is published.
 
+### Google ad consent (Android, native 0.1.11+, optional)
+
+If your app shows a consent banner (required in the EU, the EEA and the UK) and you measure Google App
+campaigns, relay its two answers, using Google's Consent Mode names. Both are persisted, so make the call
+before `Roas.initialize` where you can, and again whenever the person changes their mind:
+
+```dart
+await Roas.setGoogleConsent(adUserData: true, adPersonalization: false);
+```
+
+A person who declines `adUserData` is never sent to Google. For people in those regions nothing is sent
+until **both** answers have been given. It is a no-op on iOS, and independent of any other consent choice.
+
 ### Binding a purchase to the install (do this, or revenue is orphaned)
 
 Attribution needs the purchase to carry an id resolvable back to the install.

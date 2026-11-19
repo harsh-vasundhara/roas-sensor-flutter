@@ -110,6 +110,19 @@ class RoasFlutterPlugin : FlutterPlugin, MethodCallHandler {
 
             "visitorId" -> result.success(Roas.visitorId())
 
+            // Google's consent-mode answers (native 0.1.11+). Both are required: a missing one is
+            // a call that cannot say what the person chose, so it is refused rather than guessed.
+            "setGoogleConsent" -> {
+                val adUserData = call.argument<Boolean>("adUserData")
+                val adPersonalization = call.argument<Boolean>("adPersonalization")
+                if (adUserData == null || adPersonalization == null) {
+                    result.error("MISSING_ARG", "adUserData and adPersonalization are required", null)
+                    return
+                }
+                Roas.setGoogleConsent(adUserData, adPersonalization)
+                result.success(null)
+            }
+
             // iOS-only concept: StoreKit's appAccountToken must be a UUID, so the
             // iOS SDK derives one from the vid. Play Billing has no such
             // constraint — its obfuscatedAccountId takes the visitor id verbatim —

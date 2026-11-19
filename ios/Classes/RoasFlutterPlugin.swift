@@ -79,6 +79,12 @@ public class RoasFlutterPlugin: NSObject, FlutterPlugin {
         case "visitorId":
             result(Roas.visitorId())
 
+        case "setGoogleConsent":
+            // Android only: Google App campaigns are measured on Android, and the iOS SDK has no
+            // Google consent state. Dart never sends it here; answered rather than left to
+            // notImplemented() for the same reason as the Android side's iOS-only methods.
+            result(nil)
+
         case "appAccountToken":
             // Handed to StoreKit on a purchase so the App Store Server
             // Notification carries it back and the backend can rebuild the vid.

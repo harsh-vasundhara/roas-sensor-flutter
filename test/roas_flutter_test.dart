@@ -173,6 +173,29 @@ void main() {
     expect(calls.single.arguments, {'level': 'DEBUG'});
   });
 
+  group('Android-only methods', () {
+    test('setGoogleConsent sends both answers as named entries on Android', () async {
+      Roas.debugPlatformOverride = RoasDebugPlatform.android;
+      await Roas.setGoogleConsent(adUserData: true, adPersonalization: false);
+
+      expect(calls.single.method, 'setGoogleConsent');
+      expect(calls.single.arguments, {'adUserData': true, 'adPersonalization': false});
+    });
+
+    test('setGoogleConsent keeps a denial as false, never dropping the key', () async {
+      Roas.debugPlatformOverride = RoasDebugPlatform.android;
+      await Roas.setGoogleConsent(adUserData: false, adPersonalization: false);
+
+      expect(calls.single.arguments, {'adUserData': false, 'adPersonalization': false});
+    });
+
+    test('setGoogleConsent is a no-op on iOS and never reaches the channel', () async {
+      Roas.debugPlatformOverride = RoasDebugPlatform.ios;
+      await Roas.setGoogleConsent(adUserData: true, adPersonalization: true);
+      expect(calls, isEmpty);
+    });
+  });
+
   group('iOS-only methods', () {
     test('requestTracking is a no-op on Android and never reaches the channel', () async {
       Roas.debugPlatformOverride = RoasDebugPlatform.android;
