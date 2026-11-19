@@ -1,5 +1,5 @@
 group 'com.roassensor.roas_flutter'
-version '0.1.11'
+version '0.1.12'
 
 buildscript {
     repositories {
